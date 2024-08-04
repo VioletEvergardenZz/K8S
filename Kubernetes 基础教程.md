@@ -2411,3 +2411,668 @@ $ kubelet exec -it curl --  sh
 
 
 
+
+
+## 8. 使用 Ingress
+
+上一章节中，我们知道有以下几种方式可以实现**对外**暴露服务：
+
+- NodePort（Pod 设置 HostNetWork 同理）
+- LoadBalancer
+- ExternalIP
+
+但在实际环境中，我们很少**直接使用**这些方式来对外暴露服务，因为它们都有一个比较严重的问题，那就是需要占用节点端口。也就是说， 占用节点端口的数量会随着服务数量的增加而增加，这就产生了很大的**端口管理成本**。 除此之外，这些方式也不支持域名以及 SSL 配置（LoadBalancer 的这些功能由云厂商提供支持），还需要额外配置其他具有丰富功能的反向代理组件，如 Nginx、Kong 等。
+
+Ingress 就是为了解决这些问题而设计的，它允许你将 Service 映射到集群对外提供的某个端点上（由域名和端口组成的地址）， 这样我们就可以在 Ingress 中将多个 Service 配置到同一个域名的不同路径下对外提供服务， 避免了对节点端口的过多占用。Ingress 还支持路由规则和域名配置等高级功能，就像 Nginx 那样能够承担业务系统最边缘的反向代理+网关的角色。
+
+举个栗子：集群对外的统一端点是`api.example.com:80`，可以这样为集群内的两个 Service（`backend:8080`、`frontend:8082` ）配置对外端点映射：
+
+- api.example.com/backend 指向 backend:8080
+- api.example.com/frontend 指向 frontend:8082
+
+除此之外，Ingress 还可以为多个域名配置不同的路由规则，在仅**占用单个节点端口**的同时实现灵活的路由配置功能。
+
+总的来说，Ingress 提供以下功能：
+
+- **路由规则**：Ingress 允许你定义路由规则，使请求根据主机名和路径匹配路由到不同的后端服务。这使得可以在同一 IP 地址和端口上公开多个服务。
+- **Rewrite 规则**：Ingress 支持 URL 重写，允许你在路由过程中修改请求的 URL 路径；
+- **TLS/SSL 支持**：你可以为 Ingress 配置 TLS 证书，以加密传输到后端服务的流量；
+- **负载均衡**：Ingress 可以与云提供商的负载均衡器集成，以提供外部负载均衡和高可用性；
+- **虚拟主机**：你可以配置多个主机名（虚拟主机）来公开不同的服务。这意味着你可以在同一 IP 地址上托管多个域名；
+- **自定义错误页面**：你可以定义自定义错误页面，以提供用户友好的错误信息；
+- **插件和控制器**：社区提供了多个 Ingress 控制器，如 Nginx Ingress Controller 和 Traefik，它们为 Ingress 提供了更多功能和灵活性。
+
+Ingress 可以简单理解为集群服务的网关（Gateway），它是所有流量的入口，经过配置的路由规则，将流量重定向到后端的服务。从网络分层上看， Ingress 是作为一个七层网络代理。
+
+大部分托管集群的用户会选择 LoadBalancer 类型的 Service 而不是 Ingress 来暴露服务，因为前者由云厂商支持的优势明显，通常都是通过 Web 页面进行配置， 免去了管理清单的麻烦，而且也支持 Ingress 所支持的 SSL、负载均衡等功能，甚至包含 Ingress 不支持的四层协议代理功能！
+
+Ingress 资源不支持原生 TCP 代理服务！但大部分实现 Ingress API 的控制器（如 ingress Nginx Controller）是支持的，它们通过为 Ingress 资源添加注解的方式来实现对原生 TCP 服务的支持。参考 [Nginx: Exposing TCP and UDP services](https://kubernetes.github.io/ingress-nginx/user-guide/exposing-tcp-udp-services/)。
+
+一般不会同时使用 LoadBalancer 类型的 Service 和 Ingress 资源来暴露服务，这会造成管理上的混乱。
+
+
+
+### 8.1 Ingress 控制器
+
+使用 Ingress 时一般涉及 2 个组件：
+
+- **Ingress 清单**：是 Kubernetes 中的一种 API 资源类型，它定义了从集群外部访问集群内服务的规则。通常，这些规则涉及到 HTTP 和 HTTPS 流量的路由和负载均衡。Ingress 对象本身只是一种规则定义，它需要一个 Ingress 控制器来实际执行这些规则。
+- **Ingress 控制器：**是 Kubernetes 集群中的一个独立组件或服务，以 Pod 形式存在。它实际处理 Ingress 规则，根据这些规则配置集群中的代理服务器（如 Nginx、Traefik 等）来处理流量路由和负载均衡。
+  - Ingress 控制器负责监视 Ingress 对象的变化，然后动态更新代理服务器的配置以反映这些变化。Kubernetes 社区提供了一些不同的 Ingress 控制器，您可以根据需求选择合适的控制器。
+  - Ingress 控制器是实际**承载流量转发**的组件。每次更新 Ingress 规则后，都会动态加载到控制器中。
+
+使用 Ingress 访问服务的流量链路如下：
+
+- 用户流量通过公网 DNS 流入 Ingress Controller Pod
+- Ingress Controller Pod 根据配置的规则找到并转发流量给对应后端服务所在的 Node
+  - （下面描述的是在集群内通过 ServiceName 访问服务的流量转发流程）
+  - 首先会通过集群内的 CoreDNS 服务查询 ServiceName 对应的 ClusterIP
+  - 然后通过节点所在的 kube-proxy 所配置好的 iptables 规则将流量转发给 Pod 所在的 Node
+    - 在 iptables 规则中可以找到 ClusterIP 的下一跳，即 Pod 所在的 Node IP
+    - 若有多个 Pod 后端，则 iptables 中也会存在多条能匹配目标 ClusterIP 的规则，此时会按规则概率进行转发（默认都具有相同概率，也就是均衡）
+- Node 接收到流量后再根据（kube-proxy 所配置好的）本地 iptables 将流量转发给本地的 Pod
+
+Ingress 控制器不会随集群一起安装，需要单独安装。可以选择的 Ingress 控制器很多，可查看[官方提供的 Ingress 控制器列表](https://kubernetes.io/zh-cn/docs/concepts/services-networking/ingress-controllers/) ，再根据情况自行选择，常用的是 Nginx、Traefik。
+
+
+
+### 8.2 安装 Nginx Ingress 控制器
+
+传统架构中常用 Nginx 作为外部网关，所以这里也使用 Nginx 作为 Ingress 控制器来练习。当然，它也可应用到生产环境。
+
+- [官方仓库](https://github.com/kubernetes/ingress-nginx)
+- [官方安装指导](https://kubernetes.github.io/ingress-nginx/deploy/)
+
+先通过官方仓库页面的版本支持表确认控制器与 k8s 匹配的版本信息，笔者使用的 k8s 版本是`1.27.0`，准备安装的 Nginx ingress 控制器版本是`1.8.2`。
+
+安装方式有 Helm 安装和手动安装，Helm 是一个很好用的 k8s 包管理器（在进阶教程中有介绍），但这里先使用手动安装。
+
+```
+# 下载Nginx Ingress控制器安装文件
+# 已经 githubusercontent 替换为 gitmirror
+wget https://raw.gitmirror.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml -O nginx-ingress.yaml
+
+# 查看需要的镜像
+$ cat nginx-ingress.yaml|grep image: 
+        image: registry.k8s.io/ingress-nginx/controller:v1.8.2@sha256:74834d3d25b336b62cabeb8bf7f1d788706e2cf1cfd64022de4137ade8881ff2
+        image: registry.k8s.io/ingress-nginx/kube-webhook-certgen:v20230407@sha256:543c40fd093964bc9ab509d3e791f9989963021f1e9e4c9c7b6700b02bfb227b
+        image: registry.k8s.io/ingress-nginx/kube-webhook-certgen:v20230407@sha256:543c40fd093964bc9ab509d3e791f9989963021f1e9e4c9c7b6700b02bfb227b
+
+# 在node1上手动拉取镜像（部署的Pod会调度到非Master节点）
+$ grep -oP 'image:\s*\K[^[:space:]]+' nginx-ingress.yaml | xargs -n 1 ctr image pull
+
+# 安装
+$ kubectl apply -f nginx-ingress.yaml
+
+# 等待控制器的pod运行正常（这里自动创建了一个新的namespace）
+$ kubectl get pods --namespace=ingress-nginx --watch
+NAME                                        READY   STATUS      RESTARTS   AGE
+ingress-nginx-admission-create-kt8lm        0/1     Completed   0          2m36s
+ingress-nginx-admission-patch-rslxl         0/1     Completed   2          2m36s
+ingress-nginx-controller-6f4df7b5d6-lxfsr   1/1     Running     0          2m36s
+
+# 注意前两个 Completed 的pod是一次性的，用于执行初始化工作，现在安装成功。
+
+# 等待各项资源就绪
+$ kubectl wait --namespace ingress-nginx \
+      --for=condition=ready pod \
+      --selector=app.kubernetes.io/component=controller \
+      --timeout=120s
+  
+#查看安装的各种资源
+$ kubectl get all -n ingress-nginx
+NAME                                            READY   STATUS      RESTARTS   AGE
+pod/ingress-nginx-admission-create-smxkz        0/1     Completed   0          16m
+pod/ingress-nginx-admission-patch-7c86x         0/1     Completed   1          16m
+pod/ingress-nginx-controller-6f4df7b5d6-pz8cp   1/1     Running     0          16m
+
+NAME                                         TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)                      AGE
+service/ingress-nginx-controller             LoadBalancer   20.1.115.216   <pending>     80:31888/TCP,443:30158/TCP   16m
+service/ingress-nginx-controller-admission   ClusterIP      20.1.102.149   <none>        443/TCP                      16m
+
+NAME                                       READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/ingress-nginx-controller   1/1     1            1           16m
+
+NAME                                                  DESIRED   CURRENT   READY   AGE
+replicaset.apps/ingress-nginx-controller-6f4df7b5d6   1         1         1       16m
+
+NAME                                       COMPLETIONS   DURATION   AGE
+job.batch/ingress-nginx-admission-create   1/1           5s         16m
+job.batch/ingress-nginx-admission-patch    1/1           7s         16m
+```
+
+
+
+可能会遇到 image 拉取失败，解决如下：
+
+```
+$ kubectl get pod -ningress-nginx                                           
+NAME                                        READY   STATUS              RESTARTS   AGE
+ingress-nginx-admission-create-csfjc        0/1     ImagePullBackOff    0          5m55s
+ingress-nginx-admission-patch-rgdxr         0/1     ImagePullBackOff    0          5m55s
+ingress-nginx-controller-6f4df7b5d6-dhfg2   0/1     ContainerCreating   0          5m55s
+
+$ kubectl describe pod ingress-nginx-admission-create-csfjc -ningress-nginx
+...
+Events:
+Type     Reason     Age                   From               Message
+  ----     ------     ----                  ----               -------
+Normal   Scheduled  3m6s                  default-scheduler  Successfully assigned ingress-nginx/ingress-nginx-admission-create-csfjc to k8s-node1
+Normal   BackOff    2m19s                 kubelet            Back-off pulling image "registry.k8s.io/ingress-nginx/kube-webhook-certgen:v20230407@sha256:543c40fd093964bc9ab509d3e791f9989963021f1e9e4c9c7b6700b02bfb227b"
+Warning  Failed     2m19s                 kubelet            Error: ImagePullBackOff
+Normal   Pulling    2m5s (x2 over 3m20s)  kubelet            Pulling image "registry.k8s.io/ingress-nginx/kube-webhook-certgen:v20230407@sha256:543c40fd093964bc9ab509d3e791f9989963021f1e9e4c9c7b6700b02bfb227b"
+Warning  Failed     15s (x2 over 2m19s)   kubelet            Failed to pull image "registry.k8s.io/ingress-nginx/kube-webhook-certgen:v20230407@sha256:543c40fd093964bc9ab509d3e791f9989963021f1e9e4c9c7b6700b02bfb227b": rpc error: code = DeadlineExceeded desc = failed to pull and unpack image "registry.k8s.io/ingress-nginx/kube-webhook-certgen@sha256:543c40fd093964bc9ab509d3e791f9989963021f1e9e4c9c7b6700b02bfb227b": failed to resolve reference "registry.k8s.io/ingress-nginx/kube-webhook-certgen@sha256:543c40fd093964bc9ab509d3e791f9989963021f1e9e4c9c7b6700b02bfb227b": failed to do request: Head "https://us-west2-docker.pkg.dev/v2/k8s-artifacts-prod/images/ingress-nginx/kube-webhook-certgen/manifests/sha256:543c40fd093964bc9ab509d3e791f9989963021f1e9e4c9c7b6700b02bfb227b": dial tcp 142.251.8.82:443: i/o timeout
+
+
+# 发现无法访问 registry.k8s.io，参考 https://github.com/anjia0532/gcr.io_mirror 来解决
+# 笔者发起issue来同步nginx用到的几个镜像到作者的docker仓库，大概1min完成同步，然后现在在节点手动拉取这个可访问的docker.io下的镜像进行替代
+# 在非master节点执行（ctr是containerd cli）：
+ctr image pull docker.io/anjia0532/google-containers.ingress-nginx.kube-webhook-certgen:v20230407
+ctr image pull docker.io/anjia0532/google-containers.ingress-nginx.controller:v1.8.2
+
+# 替换模板中的镜像（mac环境需要在-i后面加 ""，即sed -i "" 's#...'）
+sed -i 's#registry.k8s.io/ingress-nginx/kube-webhook-certgen:v20230407@sha256:543c40fd093964bc9ab509d3e791f9989963021f1e9e4c9c7b6700b02bfb227b#docker.io/anjia0532/google-containers.ingress-nginx.kube-webhook-certgen:v20230407#' nginx-ingress.yaml
+sed -i 's#registry.k8s.io/ingress-nginx/controller:v1.8.2@sha256:74834d3d25b336b62cabeb8bf7f1d788706e2cf1cfd64022de4137ade8881ff2#docker.io/anjia0532/google-containers.ingress-nginx.controller:v1.8.2#' nginx-ingress.yaml
+
+# 重新部署
+kubectl delete -f nginx-ingress.yaml --force
+kubectl apply -f nginx-ingress.yaml
+```
+
+
+
+这里重点关注`service/ingress-nginx-controller`这一行，这是 Nginx Ingress 自动创建的`LoadBalancer`类型的 service， 它会跟踪 Ingress 配置中的后端 Pod 组端点变化，并实时更新 Pod `ingress-nginx-controller`中的转发规则， 后者再转发流量到 `service-hellok8s-clusterip`，然后最终到达业务 pod。
+
+所以 Nginx Ingress Controller 启动后会默认监听节点的两个随机端口（这里是 31888/30158），分别对应其 Pod 内的 80/443， 后面讲如何修改为节点固定端口。
+
+
+
+### 8.3 开始测试
+
+准备工作：
+
+1. 修改 main.go 为 [main_nginxingress.go](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/main_nginxingress.go)
+2. 重新构建并推送镜像
+
+```
+docker build . -t leigg/hellok8s:v3_nginxingress
+docker push leigg/hellok8s:v3_nginxingress
+```
+
+
+
+1. 更新 deployment 镜像：`kubectl set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:v3_nginxingress`，并等待更新完成
+2. 部署 [deployment_httpd_svc.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/deployment_httpd_svc.yaml) 作为 Ingress 后端之一
+3. 部署 Ingress [ingress-hellok8s.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/ingress-hellok8s.yaml)，其中定义了路由规则
+4. 在节点上验证
+
+```
+# 查看部署的资源（省略了不相关的资源）
+$ kubectl get pods,svc,ingress          
+NAME                                    READY   STATUS    RESTARTS       AGE
+pod/hellok8s-go-http-6bb87f8cb5-57r86   1/1     Running   1 (12h ago)    37h
+pod/hellok8s-go-http-6bb87f8cb5-lgtgf   1/1     Running   1 (12h ago)    37h
+pod/httpd-69fb5746b6-5v559              1/1     Running   0              97s
+
+NAME                                            TYPE           CLUSTER-IP     EXTERNAL-IP     PORT(S)    AGE
+service/httpd-svc                               ClusterIP      20.1.140.111   <none>          8080/TCP   97s
+service/service-hellok8s-clusterip              ClusterIP      20.1.112.41    <none>          3000/TCP   28h
+
+NAME                                         CLASS   HOSTS   ADDRESS   PORTS   AGE
+ingress.networking.k8s.io/hellok8s-ingress   nginx   *                 80      9m18s
+
+# 1-通过clusterIP访问httpd
+$ curl 20.1.140.111:8080
+<html><body><h1>It works!</h1></body></html>
+
+# 前一节讲到的nginx 以LoadBalancer类型部署的svc，所以要通过节点访问，需要先获知svc映射到节点的端口号，如下为 80:31504, 443:32548
+$ kubectl get svc -ningress-nginx
+NAME                                 TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)                      AGE
+ingress-nginx-controller             LoadBalancer   20.1.251.172   <pending>     80:31504/TCP,443:32548/TCP   19h
+ingress-nginx-controller-admission   ClusterIP      20.1.223.76    <none>        443/TCP                      19h
+
+# 2-通过节点映射端口访问 /httpd
+$ curl 127.0.0.1:31504/httpd
+<html><body><h1>It works!</h1></body></html>
+
+# 3-通过节点映射端口访问 /hello
+$ curl 127.0.0.1:31504/hello
+[v3] Hello, Kubernetes!, this is ingress test, host:hellok8s-go-http-6df8b5c5d7-75qb6
+```
+
+
+
+这就是基本的 ingress 使用步骤，还可以通过`kubectl describe -f ingress-hellok8s.yaml`查看具体路由规则。
+
+若要更新路由规则，修改 Ingress yaml 文件后再次应用即可，通过`kubectl logs -f ingress-nginx-controller-xxx -n ingress-nginx` 可以看到请求日志。
+
+这里列出几个常见的配置示例，供读者自行练习：
+
+- [虚拟域名：ingress-hellok8s-host.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/ingress-hellok8s-host.yaml)
+
+- [配置证书：ingress-hellok8s-cert.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/ingress-hellok8s-cert.yaml)
+
+- [默认后端：ingress-hellok8s-defaultbackend.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/ingress-hellok8s-defaultbackend.yaml)
+
+- [正则匹配：ingress-hellok8s-regex.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/ingress-hellok8s-regex.yaml)
+
+  
+
+### 8.4 Ingress 高可靠部署
+
+一般通过多节点部署的方式来实现高可靠，同时 Ingress 作为业务的流量入口，也建议一个 ingress 服务独占一个节点的方式进行部署， 避免业务服务与 ingress 服务发生资源争夺。
+
+> 也就是说，单独使用一台机器来部署 ingress 服务，这台机器可以是较低计算性能（如 2c4g），但需要较高的上行带宽。
+
+然后再根据业务流量规模（定期观察 ingress 节点的上行流量走势）进行 ingress 节点扩缩容。若前期规模不大，也可以 ingress 节点与业务节点混合部署的方式， 但要注意进行资源限制和隔离。
+
+**下面给出常用指令，根据需要使用**。
+
+Ingress 控制器扩容：
+
+```
+kubectl -n kube-system scale --replicas=3 deployment/nginx-ingress-controller
+```
+
+
+
+指定节点部署 ingress（通过打标签）:
+
+```
+$ kubectl label nodes k8s-node1 ingress="true"
+$ kubectl get node k8s-node1 --show-labels
+NAME        STATUS   ROLES    AGE     VERSION    LABELS
+k8s-node1   Ready    <none>   2d22h   v1.27.0    beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,ingress=true,kubernetes.io/arch=amd64,kubernetes.io/hostname=k8s-node1,kubernetes.io/os=linux
+
+# 修改ingress部署文件，搜索Deployment，在其spec.template.spec.nodeSelector下面添加 ingress: "true"
+$ vi deploy.yaml 
+#apiVersion: apps/v1
+#kind: Deployment
+#...
+#   nodeSelector:
+#    kubernetes.io/os: linux
+#    ingress: "true"  # <----- 添加这行
+#...
+
+$ kubectl apply -f deploy.yaml # 更新部署
+```
+
+
+
+注意：默认不能将应用 Pod 部署到 master 节点，存在污点问题，需要移除污点才可以，参考 [k8s-master 增加和删除污点](https://www.cnblogs.com/zouhong/p/17351418.html)。
+
+
+
+### 8.5 Ingress 部署方案推荐
+
+1. **Deployment + `LoadBalancer` 模式的 Service**
+   说明：如果要把 Ingress 部署到公有云，那用这种方式比较合适。用 Deployment 部署 ingress-controller，创建一个 type 为 `LoadBalancer` 的 service 关联这组 Pod（这是 Nginx Ingress 的默认部署方式）。大部分公有云，都会为 `LoadBalancer` 的 service 自动创建（并关联）一个负载均衡器，通常还分配了公网 IP。 只需要在负载均衡器上配置域名和证书，就实现了集群服务的对外暴露。
+2. **DaemonSet + HostNetwork + nodeSelector**
+   说明：用 DaemonSet 结合 nodeSelector 来部署 ingress-controller 到特定的 node 上，然后使用 HostNetwork 直接把该 pod 与宿主机 node 的网络打通，直接使用节点的 80/433 端口就能访问服务。 这时，ingress-controller 所在的 node 机器就很类似传统架构的边缘节点，比如机房入口的 nginx 服务器。该方式整个请求链路最简单，性能相对 NodePort 模式更好。 有一个问题是由于直接利用宿主机节点的网络和端口，一个 node 只能部署一个 ingress-controller Pod，但这在生产环境下也不算是问题，只要完成多节点部署实现高可用即可。 然后将 Ingress 节点公网 IP 填到域名 CNAME 记录中即可。
+   笔者提供测试通过的 ingress-nginx 模板供读者练习：[ingress-nginx-daemonset-hostnetwork.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/ingress-nginx-daemonset-hostnetwork.yaml)，主要修改了 3 处：
+   - `Deployment` 改为 `DaemonSet`
+   - 注释`DaemonSet`模块的`strategy`部分（strategy 是 Deployment 模块下的字段）
+   - 在 DaemonSet 模块的`spec.template.spec`下添加`hostNetwork: true`， 使用这个模板后，可以观察到在 k8s-node1 上会监听 80、443 和 8443 端口（ingress-nginx 需要的端口）。
+3. **Deployment + `NodePort`模式的 Service**
+   说明：同样用 Deployment 模式部署 ingress-controller，并创建对应的 service，但是 type 为`NodePort`。这样，Ingress 就会暴露在集群节点 ip 的特定端口上。 然后可以直接将 Ingress 节点公网 IP 填到域名 CNAME 记录中。
+   笔者提供测试通过 ingress-nginx 模板供读者练习：[ingress-nginx-deployment-nodeport.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/ingress-nginx-deployment-nodeport.yaml)，主要修改了 2 处：
+   - Service 模块下`spec.ports`部分新增`nodePort: 30080`和`nodePort: 30443`（注意`nodePort`对应的端口范围受到限制：30000-32767）。 这种方式可以使用的节点端口受到了固定范围限制，具有一定局限性，应用规划端口时需要考虑到这一点。
+
+练习时，如对 ingress-nginx 模板有修改，建议完全删除该模板对应资源（使用`kubectl delete -f deploy.yaml`，操作可能会耗时几十秒），否则直接应用可能不会生效。
+
+
+
+## 9. 使用 Namespace
+
+Namespace（命名空间）用来隔离集群内不同环境下的资源。仅同一 namespace 下的资源命名需要唯一，它的作用域仅针对带有名字空间的对象，例如 Deployment、Service 等。
+
+前面的教程中，默认使用的 namespace 是 `default`。
+
+创建多个 namespace：
+
+```
+# namespaces.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+
+---
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test
+```
+
+
+
+使用：
+
+```
+$ kubectl apply -f namespaces.yaml    
+# namespace/dev created
+# namespace/test created
+
+
+$ kubectl get namespaces          
+# NAME              STATUS   AGE
+# default           Active   215d
+# dev               Active   2m44s
+# ingress-nginx     Active   110d
+# kube-node-lease   Active   215d
+# kube-public       Active   215d
+# kube-system       Active   215d
+# test              Active   2m44s
+
+# 获取指定namespace下的资源
+$ kubectl get pods -n dev
+```
+
+
+
+需要注意的是，**删除 namespace 时**，会默认删除该空间下的所有资源，需要谨慎操作。
+
+
+
+## 10. 使用 ConfigMap 和 Secret
+
+ConfigMap 和 Secret 都是用来保存配置数据的，在模板定义和使用上没有大太差别。唯一的区别就是 Secret 是用来保存敏感型的配置数据，比如证书密钥、token 之类的。
+
+
+
+### 10.1 ConfigMap
+
+K8s 使用 ConfigMap 来将你的配置数据和应用程序代码分开，它推荐我们将一般性的配置数据保存到 ConfigMap 资源清单中。
+
+在 ConfigMap 中保存的数据不可超过 1 MiB，所以不要在 ConfigMap 中存储大量配置数据，对于占用空间较大的配置建议使用 [存储卷](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/doc_tutorial_senior.md#13-持久存储卷) 或专门的配置服务。 如果配置数据不常修改，可以随应用程序直接打包到镜像。
+
+部署 ConfigMap 资源后，我们可以用四种方式使用它：
+
+- 在容器命令和参数内
+- 容器的环境变量（常见）
+- 在只读卷里面添加一个文件，让应用来读取（常见）
+- 编写代码在 Pod 中运行，使用 Kubernetes API 来读取 ConfigMap（不常见）
+
+下面使用 ConfigMap 来保存应用Pod`hellok8s`的配置信息：
+
+```
+# configmap-hellok8s.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hellok8s-configmap
+data: # 用来保存UTF8字符串
+  DB_URL: "http://mydb.example123.com"
+binaryData: # 用来保存二进制数据作为 base64 编码的字串。
+  app-config.json: eyJkYl91cmwiOiJteXNxbC5leGFtcGxlLmNvbSJ9Cg==  # echo '{"db_url":"mysql.example.com"}' |base64
+
+# 对于一个大量使用 configmap 的集群，禁用 configmap 修改会带来以下好处
+# 1. 保护应用，使之免受意外（不想要的）更新所带来的负面影响。
+# 2. 通过大幅降低对 kube-apiserver 的压力提升集群性能， 这是因为系统会关闭对已标记为不可变更的 configmap 的监视操作。
+# 一旦标记为不可更改，这个操作就不可逆，再想要修改就只能删除并重建 configmap
+immutable: true
+```
+
+
+
+然后修改 deployment 以读取 configmap，具体看 [deployment-use-configmap.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/deployment-use-configmap.yaml)。
+
+然后再修改 main.go 为 [main_read_configmap.go](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/main_read_configmap.go)，接着重新构建并推送镜像：
+
+```
+# 先删除所有资源
+$ kubectl delete pod,deployment,service,ingress --all
+
+docker build . -t leigg/hellok8s:v4_configmap
+docker push leigg/hellok8s:v4_configmap
+
+kubectl apply -f deployment-use-configmap.yaml
+
+$ kubectl get pod                               
+NAME                                READY   STATUS    RESTARTS   AGE
+hellok8s-go-http-684ff55564-qf2x9   1/1     Running   0          3m47s
+hellok8s-go-http-684ff55564-s5bfl   1/1     Running   0          3m47s
+
+# pod直接映射到节点端口
+$ curl 10.0.2.3:3000/hello
+[v4] Hello, Kubernetes! From host: hellok8s-go-http-c548c88b5-25sl9
+Get Database Connect URL: http://mydb.example123.com
+app-config.json:{"db_url":"mysql.example.com"}
+```
+
+
+
+可以看到 app 已经拿到了 configmap 中定义的配置信息。若要更新，直接更改 configmap 的 yaml 文件然后应用，然后重启业务 pod 即可（使用`kubectl rollout restart deployment <deployment-name>`）。
+
+若 configmap 配置了`immutable: true`，则无法再进行修改：
+
+```
+$ kubectl apply -f configmap-hellok8s.yaml      
+The ConfigMap "hellok8s-configmap" is invalid: data: Forbidden: field is immutable when `immutable` is set
+```
+
+
+
+最后需要注意的是，在上面提到的四种使用 configmap 的方式中，只有挂载 volume 和调用 k8s API 的方式会接收到 configmap 的更新（具有一定延迟），其余两种则需要重启 Pod 才能看到更新。
+
+
+
+### 10.2 Secret
+
+Secret 用于存储敏感信息，例如密码、Token、（证书）密钥等，在使用上与 ConfigMap 不会有太大差别，但需要注意下面两点。
+
+- `data`的 value 部分必须是 base64 编码后的字符串（**创建时会执行 base64 解码检查**），但 Pod 中获取到的仍然是明文；
+
+- 模板语法上稍有不同
+
+  - Secret 支持的是`stringData`而不是`binaryData`，它的 value 可以是任何 UTF8 字符
+
+  - 额外支持`type`字段，用来在创建时检查资源合法性
+
+    
+
+#### 10.2.1 Secret 的类型
+
+创建 Secret 时，还可以使用 Secret 资源的 type 字段（可选），它用来告诉 k8s 我要创建何种类型的 secret，并根据类型对其进行基础的合法性检查。 当前支持的类型如下：
+
+| 类型                                | 描述                                   |
+| ----------------------------------- | -------------------------------------- |
+| Opaque                              | 用户定义的任意数据（默认）             |
+| kubernetes.io/service-account-token | 服务账号令牌                           |
+| kubernetes.io/dockercfg             | ~/.dockercfg 文件的序列化形式          |
+| kubernetes.io/dockerconfigjson      | ~/.docker/config.json 文件的序列化形式 |
+| kubernetes.io/basic-auth            | 用于基本身份认证的凭据                 |
+| kubernetes.io/ssh-auth              | 用于 SSH 身份认证的凭据                |
+| kubernetes.io/tls                   | 用于 TLS 客户端或者服务器端的数据      |
+| bootstrap.kubernetes.io/token       | 启动引导令牌数据                       |
+
+比如 type 为`kubernetes.io/tls`时，k8s 要求 secret 中必须包含`tls.crt`和`tls.key`两个字段（data 或 stringData 都可）， 但这里不会对值进行任何检查，并且这个类型也限制了创建后再修改，只能删除重建。 [secret-hellok8s-cert.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/secret-hellok8s-cert.yaml) 是一个合法的`kubernetes.io/tls` 类型的 Secret。其他类型的要求查看[官方文档](https://kubernetes.io/zh-cn/docs/concepts/configuration/secret/#secret-types)。
+
+
+
+#### 10.2.2 引用时设置可选 key
+
+正常情况下，如果引用 Secret 的某个字段不存在，则启动 Pod 时会报错，比如：
+
+```
+# 在env处引用
+...
+- name: LOG_LEVEL
+  valueFrom:
+    secretKeyRef:
+      name: hellok8s-secret # name必须是有效且存在的
+      key: not_found_key
+#      optional: true
+```
+
+
+
+k8s 允许在引用 Secret 时添加`optional: true`属性，以确保 Secret 中的字段不存在时不会影响 Pod 启动（但 Secret 对象本身必须存在）。
+
+
+
+#### 10.2.3 拉取私有镜像使用 Secret
+
+如果你尝试从私有仓库拉取容器镜像，你需要一种方式让每个节点上的 kubelet 能够完成与镜像库的身份认证。 你可以配置 `imagePullSecrets`字段来实现这点。 Secret 是在 Pod 层面来配置的。
+
+有两种方式来配置 `imagePullSecrets`：
+
+1. [直接在 Pod 上指定 `ImagePullSecrets`](https://kubernetes.io/zh-cn/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod)；
+2. [向 ServiceAccount 添加 `ImagePullSecrets`](https://kubernetes.io/zh-cn/docs/tasks/configure-pod-container/configure-service-account/#add-imagepullsecrets-to-a-service-account)；
+
+第一种方式需要对使用私有仓库的每个 Pod 执行以上操作，如果 App 较多，可能比较麻烦。 第二种方式是推荐的方式，因为 ServiceAccount 是一个集群范围内的概念，所以只需要在 ServiceAccount 上添加 Secret， 所有引用该 ServiceAccount 的 Pod 都会自动使用该 Secret。
+
+完整演示这一步需要私有镜像仓库，此节测试略过。
+
+
+
+#### 10.2.4 在 Pod 内测试
+
+笔者提供测试通过的模板和代码供读者自行测试：
+
+- [secret-hellok8s-misc.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/secret-hellok8s-misc.yaml)
+- [deployment-use-secret.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/deployment-use-secret.yaml)
+- [main_read_secret.go](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/main_read_secret.go)
+
+测试结果：
+
+```
+$ curl 10.0.2.3:3000/hello
+[v4] Hello, Kubernetes! From host: hellok8s-go-http-869d4548dc-vtmcr, Get Database Passwd: pass123
+
+some.txt:hello world
+cert.key:-----BEGIN OPENSSH PRIVATE KEY-----
+J1a9V50zOAl0k2Fpmy+RDvCy/2LeCZHyWY9MR248Ah2Ko3VywDrevdPIz8bxg9zxqy0+xy
+jbu09sNix9b0IZuZQbbGkw4C4RcAN5HZ4UnWWRfzv2KgtXSdJCPp38hsWH2j9hmlNXLZz0
+EqqtXGJpxjV67NAAAACkxlaWdnQEx1eWk=
+-----END OPENSSH PRIVATE KEY-----
+config.yaml:username: hellok8s
+password: pass123
+```
+
+
+
+#### 10.2.5 使用命令创建 secret
+
+除了通过模板方式创建 Secret，我们还可以通过 kubectl 命令直接创建 Secret：
+
+```
+# generic表示常规类型，通过 kubectl create secret -h 查看参数说明
+$ kubectl create secret generic db-user-pass \
+     --from-literal=username=admin \
+     --from-literal=password='S!B\*d$zDsb='
+secret/db-user-pass created
+
+# 或者通过文件创建
+$ kubectl create secret generic db-user-pass \
+    --from-file=./username.txt \
+    --from-file=./password.txt
+```
+
+
+
+创建后直接查看 Secret 明文：
+
+```
+$ kubectl describe secret db-user-pass                                                                         
+Name:         db-user-pass
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+
+Type:  Opaque
+
+Data
+====
+password:  12 bytes
+username:  5 bytes
+$ kubectl get secret db-user-pass -o jsonpath='{.data}'                  
+{"password":"UyFCXCpkJHpEc2I9","username":"YWRtaW4="} # value是base64编码
+$ echo UyFCXCpkJHpEc2I9 |base64 --decode                      
+S!B\*d$zDsb=
+
+$ kubectl get secret db-user-pass -o jsonpath='{.data.password}' | base64 --decode
+S!B\*d$zDsb=#                                                                                                                                                                                
+$ kubectl get secret db-user-pass -o jsonpath='{.data.username}' | base64 --decode
+admin
+```
+
+
+
+删除 Secret：
+
+```
+$ kubectl delete secret db-user-pass                                 
+secret "db-user-pass" deleted
+```
+
+
+
+### 10.3 Downward API
+
+有时候，容器需要获得关于自身的信息，但不能与 k8s 过于耦合，Downward API 就是用来解决这个问题的。 Downward API 允许容器在不使用 Kubernetes 客户端或 API 服务器的情况下获得自己或集群的信息，具体通过下面两种方式实现：
+
+- 作为环境变量
+- 作为 `downwardAPI` 卷中的文件
+
+这两种暴露 Pod 和容器字段的方式统称为 Downward API。
+
+**可用字段**
+只有部分 Kubernetes API 字段可以通过 Downward API 使用。本节列出了你可以使用的字段。 你可以使用 `fieldRef` 传递来自可用的 Pod 级字段的信息。
+
+- metadata.name：Pod 名称
+- metadata.namespace：Pod 的命名空间
+- metadata.uid：Pod 的唯一 ID
+- metadata.annotations['']：Pod 的注解 的值
+- metadata.labels['']：Pod 的标签 的值
+
+以下信息可以通过环境变量获得，但**不能作为 `downwardAPI` 卷`fieldRef`** 获得：
+
+- spec.serviceAccountName：Pod 的服务账号名称
+- spec.nodeName：Pod 运行时所处的节点名称
+- status.hostIP：Pod 所在节点的主 IP 地址
+- status.hostIPs：这组 IP 地址是 status.hostIP 的双协议栈版本，第一个 IP 始终与 status.hostIP 相同。 该字段在启用了 PodHostIPs 特性门控后可用。
+- status.podIP：Pod 的主 IP 地址（通常是其 IPv4 地址）
+
+以下信息可以通过 downwardAPI 卷`fieldRef` 获得，但**不能作为环境变量**获得：
+
+- metadata.labels：Pod 的所有标签，格式为 标签键名="转义后的标签值"，每行一个标签
+- metadata.annotations：Pod 的全部注解，格式为 注解键名="转义后的注解值"，每行一个注解
+
+可通过 resourceFieldRef 获得的信息:
+
+- limits.cpu：容器的 CPU 限制值
+- requests.cpu：容器的 CPU 请求值
+- limits.memory：容器的内存限制值
+- requests.memory：容器的内存请求值
+- limits.hugepages-*：容器的巨页限制值
+- requests.hugepages-*：容器的巨页请求值
+- limits.ephemeral-storage：容器的临时存储的限制值
+- requests.ephemeral-storage：容器的临时存储的请求值
+
+如果没有为容器指定 CPU 和内存限制时尝试使用 Downward API 暴露该信息，那么 kubelet 默认会根据 [节点可分配资源](https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable) 计算并暴露 CPU 和内存的最大可分配值。
+
+下面使用 [pod_use_downwardAPI.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/pod_use_downwardAPI.yaml) 进行测试：
+
+```
+$ kubectl apply -f pod_use_downwardAPI.yaml
+pod/busybox-use-downwardapi created
+
+$ kubectl get pod                                                  
+NAME                      READY   STATUS    RESTARTS             AGE
+busybox-use-downwardapi   1/1     Running   0                    59s
+
+$ kubectl logs busybox-use-downwardapi            
+hellok8s, downwardAPI! PodName=busybox-use-downwardapi LIMITS_CPU=1 POD_IP=20.2.36.86
+
+$ kubectl exec -it busybox-use-downwardapi --  sh
+/ # ls /config/downward_api_info/
+LABELS    POD_NAME
+/ # cat /config/downward_api_info/LABELS 
+app="busybox"
+label_test="some_value"
+/ # cat /config/downward_api_info/POD_NAME 
+busybox-use-downwardapi
+```
+
