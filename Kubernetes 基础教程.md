@@ -886,10 +886,10 @@ $ date # 检查时间
 
 编写[Dockerfile](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/Dockerfile)
 
-打包镜像（替换 xiaoxiao 为你的 docker 账户名）
+打包镜像（替换 leigg为你的 docker 账户名）
 
 ```
-docker build . -t xiaoxiao/hellok8s:v1
+docker build . -t leigg/hellok8s:v1
 ```
 
 
@@ -906,7 +906,7 @@ docker image prune -f
 测试运行：
 
 ```
-docker run --rm -p 3000:3000 xiaoxiao/hellok8s:v1
+docker run --rm -p 3000:3000 leigg/hellok8s:v1
 ```
 
 
@@ -930,7 +930,7 @@ $ docker login  # 然后输入自己的docker账户和密码，没有先去官�
 推送镜像到远程 hub
 
 ```
-docker push xiaoxaio/hellok8s:v1
+docker push leigg/hellok8s:v1
 ```
 
 
@@ -1118,7 +1118,7 @@ Init 容器具有与应用容器分离的单独镜像，我们可以使用它来
 
 ### 3.6 创建 Go 程序的 Pod
 
-定义[pod.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/pod.yaml)，这里面使用了之前已经推送的镜像`xiaoxaio/hellok8s:v1`
+定义[pod.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/pod.yaml)，这里面使用了之前已经推送的镜像`leigg/hellok8s:v1`
 
 创建 Pod：
 
@@ -1165,7 +1165,7 @@ $ curl http://localhost:3000
 - Unknown（未知）： 无法获取 Pod 的状态，通常是与 Pod 所在节点通信失败导致。
 
 **关于 Pod 的重启策略**
-即`spec.restartPolicy`字段，可选值为 Always/OnFailure/Never。此策略对 Pod 内所有容器有效， 由 Pod 所在 Node 上的 kubelet 执行判断和重启。由 kubelet 重启的已退出容器将会以递增延迟的方式（10s，20s，40s...） 尝试重启，上限 5min。成功运行 10min 后这个时间会重置。**一旦 Pod 绑定到某个节点上，除非节点自身问题或手动调整， 否则不会再调度到其他节点**。
+即`spec.restartPolicy`字段，可选值为 **Always/OnFailure/Never**。此策略对 Pod 内所有容器有效， 由 Pod 所在 Node 上的 kubelet 执行判断和重启。由 kubelet 重启的已退出容器将会以递增延迟的方式（10s，20s，40s...） 尝试重启，上限 5min。成功运行 10min 后这个时间会重置。**一旦 Pod 绑定到某个节点上，除非节点自身问题或手动调整， 否则不会再调度到其他节点**。
 
 **Pod 的销毁过程**
 当 Pod 需要销毁时，kubelet 会先向 API Server 发送删除请求，然后等待 Pod 中所有容器停止，包含以下过程:
@@ -1219,7 +1219,7 @@ Pod 中的容器所看到的系统主机名与为 Pod 名称相同。
 
 通常，Pod 不会被直接创建和管理，而是由更高级别的控制器，例如 Deployment 来创建和管理。 这是因为控制器提供了更强大的**应用程序管理功能**。
 
-- **应用管理**：Deployment 是 Kubernetes 中的一个控制器，用于管理应用程序的部署和更新。它允许你定义应用程序的期望状态，然后确保集群中的副本数符合这个状态。
+- **应用管理**：Deployment 是 Kubernetes 中的一个控制器，用于管理应用程序的**部署和更新**。它允许你定义应用程序的期望状态，然后确保集群中的副本数符合这个状态。
 
 - **自愈能力**：Deployment 可以自动修复故障，如果 Pod 失败，它将启动新的 Pod 来替代。这有助于确保应用程序的高可用性。
 
@@ -1303,7 +1303,7 @@ hellok8s-go-http-58cb496c84-sdrt2   1/1     Running             0          1s
 重新构建&推送镜像：
 
 ```
-docker build . -t xiaoxiao/hellok8s:v2
+docker build . -t leigg/hellok8s:v2
 docker push leigg/hellok8s:v2
 ```
 
@@ -1405,8 +1405,8 @@ REVISION  CHANGE-CAUSE
 按照下面的步骤进行：
 
 1. 修改 main.go 为 [main_panic.go](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/main_panic.go) ；
-2. 构建镜像: `docker build . -t xiaoxiao/hellok8s:v2_problem`
-3. push 镜像：`docker push xiaoxiao/hellok8s:v2_problem`
+2. 构建镜像: `docker build . -t leigg/hellok8s:v2_problem`
+3. push 镜像：`docker push leigg/hellok8s:v2_problem`
 4. 更新 deployment 使用的镜像：`kk set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:v2_problem`
 5. 观察：`kk rollout status deployment/hellok8s-go-http` （会停滞，按 Ctrl-C 停止观察）
 6. 观察 pod：`kk get pods`
@@ -1427,9 +1427,9 @@ hellok8s-go-http-7c9d684dd-msj2c    0/1     CrashLoopBackOff   1 (4s ago)   6s
 # -l 进行标签筛选
 $ kk get rs -l app=hellok8s -o wide
 NAME                          DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES                      SELECTOR
-hellok8s-go-http-55cfd74847   0         0         0       76s   hellok8s     xiaoxiao/hellok8s:v1           app=hellok8s,pod-template-hash=55cfd74847
-hellok8s-go-http-668c7f75bd   3         3         3       55s   hellok8s     xiaoxiao/hellok8s:v2           app=hellok8s,pod-template-hash=668c7f75bd
-hellok8s-go-http-7c9d684dd    1         1         0       11s   hellok8s     xiaoxiao/hellok8s:v2_problem   app=hellok8s,pod-template-hash=7c9d684dd
+hellok8s-go-http-55cfd74847   0         0         0       76s   hellok8s     leigg/hellok8s:v1           app=hellok8s,pod-template-hash=55cfd74847
+hellok8s-go-http-668c7f75bd   3         3         3       55s   hellok8s     leigg/hellok8s:v2           app=hellok8s,pod-template-hash=668c7f75bd
+hellok8s-go-http-7c9d684dd    1         1         0       11s   hellok8s     leigg/hellok8s:v2_problem   app=hellok8s,pod-template-hash=7c9d684dd
 ```
 
 
@@ -1561,8 +1561,8 @@ hellok8s-go-http-7c9d684dd    0         0         0       32m   hellok8s     lei
 下面更新 app 代码为[main_liveness.go](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/main_liveness.go)，并且构建新的镜像以及推送到远程仓库：
 
 ```
-docker build . -t xiaoxaio/hellok8s:liveness
-docker push xiaoxiao/hellok8s:liveness
+docker build . -t leigg/hellok8s:liveness
+docker push leigg/hellok8s:liveness
 ```
 
 
@@ -1606,7 +1606,7 @@ spec:
 
 ```
 kk apply -f deployment.yaml
-kk set image deployment/hellok8s-go-http hellok8s=xiaoxaio/hellok8s:liveness
+kk set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:liveness
 ```
 
 
@@ -1651,8 +1651,8 @@ Events:
 下面更新 app 代码为[main_readiness.go](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/main_readiness.go)，并且构建新的镜像以及推送到远程仓库：
 
 ```
-docker build . -t xiaoxaio/hellok8s:readiness
-docker push xiaoxiao/hellok8s:readiness
+docker build . -t leigg/hellok8s:readiness
+docker push leigg/hellok8s:readiness
 ```
 
 
@@ -1713,7 +1713,7 @@ kk rollout resume deploy {deploy-name}
 
 ```
 # 一次性执行两条命令
-kk set image deployment/hellok8s-go-http hellok8s=xiaoxiao/hellok8s:v2
+kk set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:v2
 kk rollout pause deploy hellok8s-go-http
 
 # 现在观察更新情况，会发现只有一个pod被更新
@@ -1739,4 +1739,677 @@ kk rollout resume deploy hellok8s-go-http
 ReplicaSet 是一个相比 Deployment 更低级的控制器，它负责维护一组在任何时候都处于运行状态且符合预期数量的 Pod 副本的稳定集合。 然而由于 ReplicaSet 不具备滚动更新和回滚等一些业务常用的流水线功能，所以通常情况下，我们更推荐使用 Deployment 或 DaemonSet 等其他控制器 而不是直接使用 ReplicaSet。你可以通过 [官方文档](https://kubernetes.io/zh-cn/docs/concepts/workloads/controllers/ReplicaSet) 了解更多 ReplicaSet 细节。
 
 [replicaset.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/replicaset.yaml) 是一个可参考的示例。
+
+
+
+
+
+## 5. 使用 DaemonSet
+
+
+
+DaemonSet 是一种特殊的控制器，它确保会在集群的**每个节点**（或大部分）上都运行 **一个** Pod 副本。在节点加入或退出集群时，DaemonSet 也会在相应节点增加或删除 Pod。 因此常用来**部署那些为节点本身提供服务或维护的 Pod**（如日志收集和转发、监控等）。
+
+因为这一特性，DaemonSet 应用通常会在模板中直接指定映射容器端口到节点端口，不用担心同一个节点会运行多个 Pod 副本而导致端口冲突。
+
+DaemonSet 通常会运行在每个节点上，但不包括 master 节点。因为 master 节点默认存在不允许调度 Pod 的 **污点** ，所以一般会在模板中为 Pod 配置污点容忍度来实现在 master 节点上运行 DaemonSet Pod（如果不需要在 master 节点运行则无需配置）。
+
+[daemonset.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/daemonset.yaml) 是一个 DaemonSet 的模板示例。它的管理命令与 Deployment 没有较大差别，只是 DaemonSet 不基于 ReplicaSet。 具体演示如下：
+
+```
+$ kk apply -f daemonset.yaml 
+daemonset.apps/daemonset-hellok8s-go-http created
+$ kk get daemonset          
+NAME                         DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+daemonset-hellok8s-go-http   2         2         2       2            2           <none>          8s
+
+$ kk get po -o wide|grep daemonset 
+daemonset-hellok8s-go-http-gwbsh    1/1     Running   0                    51s     20.2.36.75   k8s-node1    <none>           <none>
+daemonset-hellok8s-go-http-v44jm    1/1     Running   0                    51s     20.2.36.74   k8s-master   <none>           <none>
+
+$ kk set image daemonset/daemonset-hellok8s-go-http hellok8s=leigg/hellok8s:v2 
+daemonset.apps/daemonset-hellok8s-go-http image updated
+
+$ kk rollout status daemonset/daemonset-hellok8s-go-http                             
+daemon set "daemonset-hellok8s-go-http" successfully rolled out
+
+$ kk rollout history daemonset/daemonset-hellok8s-go-http
+daemonset.apps/daemonset-hellok8s-go-http 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+
+$ kk get daemonset -o wide                               
+NAME                         DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE   CONTAINERS   IMAGES              SELECTOR
+daemonset-hellok8s-go-http   2         2         2       2            2           <none>          15m   hellok8s     leigg/hellok8s:v2   app=hellok8s
+```
+
+
+
+## 6. 使用 Job 和 CronJob
+
+
+
+Job 和 CronJob 控制器与 Deployment、Daemonset 都是同级的控制器。它俩都是用来执行一次性任务的，区别在于 Job 是一次性的，而 CronJob 是周期性的。
+
+本节使用 k8s 官方提供的 [playground 平台](https://labs.play-with-k8s.com/) 来进行测试，简单几步就可以搭建起一个临时的多节点 k8s 集群， 这里也推荐使用，练习/演示必备。（当然读者也可以使用已经搭建好的集群进行测试）
+
+
+
+### 6.1 使用 Job
+
+具体来说，Job 控制器可以执行 3 种类型的任务。
+
+- 一次性任务：启动一个 Pod（除非启动失败）。一旦 Pod 成功终止，Job 就算完成了。
+- 串行式任务：连续、多次地执行某个任务，上一个任务完成后，立即执行下个任务，直到全部执行完。
+- 并行式任务：可以通过 spec.completions 属性指定执行次数。
+
+使用 [job.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/example_job/job.yaml) 测试**一次性任务**：
+
+```
+[node1 ~]$ kk apply -f job.yaml 
+job.batch/pods-job created
+
+[node1 ~]$ kk get job
+NAME     COMPLETIONS  DURATION   AGE
+pods-job   0/1           19s     19s
+
+# DURATION 表示job启动到结束耗时
+[node1 ~]$ kk get job
+NAME     COMPLETIONS   DURATION   AGE
+pods-job   1/1           36s     60s
+
+# Completed 表示pod正常终止
+[node1 ~]$ kk get pods
+NAME                    READY   STATUS      RESTARTS   AGE
+pods-simple-pod-kdjr6   0/1     Completed   0          4m41s
+
+# 查看pod日志（标准输出和错误）
+[node1 ~]$ kk logs pods-simple-pod-kdjr6
+Start Job!
+Job Done!
+
+# 执行结束后，手动删除job，也可在yaml中配置自动删除
+[node1 ~]$ kk delete job pods-job
+job.batch "pods-job" deleted
+```
+
+
+
+配置文件中启动`completions`字段来设置任务需要执行的总次数（串行式任务），启动`parallelism`字段来设置任务并发数量（并行式任务）。
+
+**处理异常情况**
+任务执行失败，可以通过`backoffLimit`字段设置失败重试次数，默认是 6 次。并且推荐设置`restartPolicy`为 Never（而不是 OnFailure）， 这样可以保留启动失败的 Pod，以便排查日志。
+
+
+
+### 6.2 使用 CronJob
+
+它是基于 Job 的更高级的控制器，添加了时间管理功能。可以实现：
+
+- 在未来某个指定时间运行一次 Job
+- 周期性运行 Job
+
+使用 [cronjob.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/example_job/cronjob.yaml) 测试：
+
+```
+[node1 ~]$ kk apply -f cronjob.yaml 
+job.batch/pods-cronjob created
+
+[node1 ~]$ kk get cronjob
+NAME           SCHEDULE      SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+pods-cronjob   */1 * * * *   False     1        28s             10s
+
+# cronjob内部还是调用的job
+[node1 ~]$ kk get job
+NAME                    COMPLETIONS   DURATION   AGE
+pods-cronjob-28305226   1/1           34s        2m54s
+pods-cronjob-28305227   1/1           34s        114s
+pods-cronjob-28305228   1/1           34s        54s
+
+# 删除cronjob，会自动删除关联的job, pod
+[node1 ~]$ kk delete cronjob pods-cronjob
+cronjob.batch "pods-cronjob" deleted
+[node1 ~]$ kk get job
+No resources found in default namespace.
+```
+
+
+
+### 6.3 其他控制器
+
+除了前面介绍的 Deployment、DaemonSet、Job 和 CronJob 控制器，其他还有：
+
+- ReplicationController 和 ReplicaSetController
+- StatefulController
+
+**关于 ReplicationController 和 ReplicaSetController**
+在早期的 k8s 版本中，ReplicationController 是最早提供的控制器，后来 ReplicaSetController 出现并替代了前者，二者没有本质上的区别， 后者支持复合式的 selector。在 Deployment 出现后，由于它们缺少其他后来新增控制器的更细粒度的生命周期管理功能， 导致 ReplicationController 和 ReplicaSetController 已经很少使用，但仍然保留下来。
+
+在后来的版本中，一般都是创建 Deployment 控制器，由它自动托管 ReplicaSetController，用户无需操心后者（但可以命令查看）。 ReplicaSetController 也可通过模板创建，可自行查询。需要注意的是，手动创建的 ReplicaSetController 不能由 Deployment 控制器托管， 所以 ReplicaSetController 也不具有滚动更新、版本查看和回滚功能。
+
+**StatefulController**
+这是一种提供排序和唯一性保证的特殊 Pod 控制器，将在后面的章节中进行介绍。
+
+下一节，将介绍前面这些 Controller 控制的 Pod 集合如何有效且稳定的对外暴露服务。
+
+
+
+
+
+## 7. 使用 Service
+
+
+
+先提出几个问题：
+
+- 在前面的内容中，我们通过`port-forward`的临时方式来访问 pod，需要指定某个 pod 名称，而如果 pod 发生扩容或重启，pod 名称就会变化， 那如何获取稳定的 pod 访问地址呢？
+- deployment 通常会包含多个 pod，如何进行负载均衡？
+
+Service 就是用来解决上述问题的。
+
+Kubernetes 提供了一种名叫 Service 的资源帮助解决这些问题，它为 Pod 提供一个可稳定访问的端点（以 ServiceName 作为虚拟域名的形式）。Service 位于 Pod 的前面，负责接收请求并将它们传递给它后面的所有 Pod。 在 Service 内部动态维护了**一组 Pod 资源的访问端点**（Endpoints），一旦服务中的 Pod 集合发生更改，Endpoints 就会被更新，请求的重定向自然也会导向最新的 Pod。
+
+Service 为 Pod 提供了**网络访问、负载均衡以及服务发现等功能**。从网络分层上看，Service 是作为一个四层网络代理。
+
+
+
+### 7.1 不同类型的 Service
+
+Kubernetes 提供了多种类型的 Service，包括 ClusterIP、NodePort、LoadBalancer、Headless 和 ExternalName，每种类型服务有不同的需求和用例。 Service 类型的选择取决于你的应用程序的具体要求以及你希望**如何将其暴露到网络中**。
+
+- ClusterIP:
+
+  - 原理：使用这种方式发布时，会为 Service 提供一个固定的集群内部虚拟 IP，供集群内（包含节点）访问。
+  - 场景：内部数据库服务、内部 API 服务等。
+
+- NodePort:
+
+  - 原理：通过每个节点上的 IP 和静态端口发布服务。 这是一种基于 ClusterIP 的发布方式，因为它应用后首先会生成一个集群内部 IP， 然后再将其绑定到节点的 IP 和端口，这样就可以在集群外通过 `nodeIp:port` 的方式访问服务。
+  - 场景：Web 应用程序、REST API 等。
+
+- LoadBalancer:
+
+  - 原理：这种方式又基于 NodePort，另外还会使用到外部由云厂商提供的负载均衡器。由后者向外发布 Service。 一般在使用云平台提供的 Kubernetes 集群时，会用到这种方式。
+  - 场景：Web 应用程序、公开的 API 服务等。
+
+- Headless:
+
+  - 原理：这种方式不会分配任何集群 IP，也不会通过 Kube-proxy 进行反向代理和负载均衡，而是通过 DNS 提供稳定的网络 ID 来访问， 并且 DNS 会将无头 Service 的后端解析为 Pod 的后端 IP 列表，以供集群内访问（不含节点），属于**向内发布**。
+  - 场景：一般提供给 StatefulSet 使用。
+
+- ExternalName:
+
+  - 原理：与上面提到的发布方式不太相同，这种方式是通过 CNAME 机制将外部服务引入集群内部，为集群内提供服务，属于**向内发布 **。
+
+  - 场景：连接到外部数据库服务、外部认证服务等。
+
+    
+
+### 7.2 Service 类型之 ClusterIP
+
+ClusterIP 通过分配集群内部 IP 来在**集群内**（包含节点）暴露服务，这样就可以在集群内通过 `clusterIP:port` 访问到 pod 服务，集群外则无法访问。 ClusterIP 又可以叫做 Service VIP（虚拟 IP）。
+
+这种方式适用于那些不需要对外暴露的集群内基础设施服务，如节点守护 agent/数据库等。
+
+准备工作：
+
+1. 修改 main.go 为 [main_hostname.go](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/main_hostname.go)
+2. 重新构建和推送镜像
+
+```
+docker build . -t leigg/hellok8s:v3_hostname
+docker push leigg/hellok8s:v3_hostname
+```
+
+
+
+1. 更新 deployment 使用的 image
+
+```
+kk set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:v3_hostname
+
+# 等待pod更新
+kk get pods --watch
+```
+
+
+
+1. deployment 更新成功后，编写 Service 配置文件 [service-clusterip.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/service-clusterip.yaml)
+2. 应用 Service 配置文件，并观察 Endpoint 资源
+
+```
+kk apply -f service-clusterip.yaml
+
+$ kk get svc
+NAME                         TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)    AGE
+kubernetes                   ClusterIP   20.1.0.1      <none>        443/TCP    11h
+service-hellok8s-clusterip   ClusterIP   20.1.120.16   <none>        3000/TCP   20s
+
+$ kk get endpoints                  
+NAME                         ENDPOINTS                         AGE
+kubernetes                   10.0.2.2:6443                     6h54m
+service-hellok8s-clusterip   20.2.36.72:3000,20.2.36.73:3000   6m38s
+```
+
+
+
+这里通过`kk get svc`获取到的就是集群内`default`空间下的 service 列表，我们发布的自然是第二个，它的 ClusterIP 是`20.1.120.16`， 这个 IP 是可以在节点直接访问的：
+
+```
+$ curl 20.1.120.16:3000
+[v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-dstff
+# 多次访问，会观察到hostname变化，说明service进行了负载均衡
+$ curl 20.1.120.16:3000 
+[v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-wtdht
+```
+
+
+
+然后我们通过`kk get endpoints`获取到的是 **Service 后端的逻辑 Pod 组的信息**，`ENDPOINTS` 列中包含的两个地址则是两个就绪的 pod 的访问地址（这个 IP 是 Pod 专属网段，节点无法直接访问）， 这些端点是和就绪的 pod 保持一致的（Service 会实时跟踪），下面通过控制 Pod 数量增减来观察。
+
+在 Kubernetes 中，Endpoints 是一种资源对象，用于指定与一个 Service 关联的后端 Pod 的 IP 地址和端口信息。 Endpoints 对象充当服务发现机制的一部分，它告诉 Kubernetes 如何将流量路由到 Service 的后端 Pod。
+
+Endpoints 一般都是通过 Service 自动生成的，Service 会自动跟踪关联的 Pod，当 Pod 状态发生变化时会自动更新 Endpoints。
+
+```
+$ kk scale deployment/hellok8s-go-http --replicas=3                      
+deployment.apps/hellok8s-go-http scaled
+
+$ kk get endpoints                                      
+NAME                         ENDPOINTS                                         AGE
+kubernetes                   10.0.2.2:6443                                     7h3m
+service-hellok8s-clusterip   20.2.36.72:3000,20.2.36.73:3000,20.2.36.74:3000   15m
+
+$ kk scale deployment/hellok8s-go-http --replicas=2
+deployment.apps/hellok8s-go-http scaled
+
+# 注意pod ip可能发生变化
+$ kk get endpoints                                      
+NAME                         ENDPOINTS                         AGE
+kubernetes                   10.0.2.2:6443                     7h5m
+service-hellok8s-clusterip   20.2.36.72:3000,20.2.36.75:3000   17m
+```
+
+
+
+`ClusterIP`除了在节点上可直接访问，在集群内也是可以访问的。下面启动一个 Nginx Pod 来访问这个虚拟的 ClusterIP （`20.1.120.16`）。
+
+1. 定义 [pod_nginx.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/pod_nginx.yaml)，并应用它，不再演示。( 可提前在 node 上拉取镜像：`ctr -n k8s.io images pull docker.io/library/nginx:latest`)
+2. 进入 nginx pod shell，尝试访问 `service-hellok8s-clusterip`提供的 endpoint
+
+```
+$ kk get pods --watch
+NAME                                READY   STATUS    RESTARTS   AGE
+hellok8s-go-http-6bb87f8cb5-dstff   1/1     Running   0          27m
+hellok8s-go-http-6bb87f8cb5-wtdht   1/1     Running   0          11m
+nginx                               1/1     Running   0          11s
+
+# 进入 nginx pod
+$ kk exec -it nginx -- bash 
+kk exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kk exec [POD] -- [COMMAND] instead.
+
+# 访问 hellok8s 的 cluster ip
+root@nginx:/# curl 20.1.120.16:3000
+[v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-dstff
+root@nginx:/# curl 20.1.120.16:3000
+[v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-wtdht
+```
+
+
+
+**Service 访问及负载均衡原理**
+如果还记得文章开头的架构图，就会发现每个节点都运行着一个 kube-proxy 组件，这个组件会跟踪 Service 和 Pod 的动态变化，并且最新 的 Service 和 Pod 的映射关系会被记录到**每个节点**的 iptables 中，这样每个节点上的 iptables 规则都会随着 Service 和 Pod 资源自动更新。
+
+iptables 使用 NAT 技术将虚拟 IP（也叫做 VIP）的流量转发到 Endpoint。
+
+通过在 master 节点（其他节点也可）`iptables -L -v -n -t nat`可以查看其配置，这个结果会很长。这里贴出关键的两条链：
+
+```
+$ iptables -L -v -n -t nat
+...
+Chain KUBE-SERVICES (2 references)
+ pkts bytes target     prot opt in     out     source               destination         
+    0     0 KUBE-SVC-JD5MR3NA4I4DYORP  tcp  --  *      *       0.0.0.0/0            20.1.0.10            /* kube-system/kube-dns:metrics cluster IP */ tcp dpt:9153
+    6   360 KUBE-SVC-BRULDGNIV2IQDBPU  tcp  --  *      *       0.0.0.0/0            20.1.120.16          /* default/service-hellok8s-clusterip cluster IP */ tcp dpt:3000
+    0     0 KUBE-SVC-NPX46M4PTMTKRN6Y  tcp  --  *      *       0.0.0.0/0            20.1.0.1             /* default/kubernetes:https cluster IP */ tcp dpt:443
+    0     0 KUBE-SVC-TCOU7JCQXEZGVUNU  udp  --  *      *       0.0.0.0/0            20.1.0.10            /* kube-system/kube-dns:dns cluster IP */ udp dpt:53
+    0     0 KUBE-SVC-ERIFXISQEP7F7OF4  tcp  --  *      *       0.0.0.0/0            20.1.0.10            /* kube-system/kube-dns:dns-tcp cluster IP */ tcp dpt:53
+ 1079 64740 KUBE-NODEPORTS  all  --  *      *       0.0.0.0/0            0.0.0.0/0            /* kubernetes service nodeports; NOTE: this must be the last rule in this chain */ ADDRTYPE match dst-type LOCAL
+
+Chain KUBE-SVC-BRULDGNIV2IQDBPU (1 references)
+ pkts bytes target     prot opt in     out     source               destination         
+    6   360 KUBE-MARK-MASQ  tcp  --  *      *      !20.2.0.0/16          20.1.120.16          /* default/service-hellok8s-clusterip cluster IP */ tcp dpt:3000
+    2   120 KUBE-SEP-JCBKJJ6OJ3DPB6OD  all  --  *      *       0.0.0.0/0            0.0.0.0/0            /* default/service-hellok8s-clusterip -> 20.2.36.77:3000 */ statistic mode random probability 0.50000000000
+    4   240 KUBE-SEP-YHSEP23J6IVZKCOG  all  --  *      *       0.0.0.0/0            0.0.0.0/0            /* default/service-hellok8s-clusterip -> 20.2.36.78:3000 */
+...
+```
+
+
+
+这里有 `KUBE-SERVICES`和 `KUBE-SVC-BRULDGNIV2IQDBPU`两条链，前者引用了后者。第一条链中，可以看到目标为`20.1.120.16` 的流量将被转发至`KUBE-SVC-BRULDGNIV2IQDBPU`链，即第二条链。在第二条链中又定义了 3 条转发规则：
+
+- 第一条规则会对源不是`20.2.0.0/16`地址范围内且目标端口是 3000 的所有 tcp 数据包执行 MASQ 动作，即 NAT 操作（转发时执行源 IP 替换）
+- 第二条规则将任意链内流量转发到目标`KUBE-SEP-JCBKJJ6OJ3DPB6OD`，尾部`probability`说明应用此规则的概率是 0.5
+- 第三条规则将任意链内流量转发到目标`KUBE-SEP-YHSEP23J6IVZKCOG`，概率也是 0.5（1-0.5） 而这 2 和 3 两条规则中的目标其实就是指向两个后端 Pod IP，可通过`iptables-save | grep KUBE-SEP-YHSEP23J6IVZKCOG` 查看其中一个目标明细：
+
+```
+$ iptables-save | grep KUBE-SEP-YHSEP23J6IVZKCOG
+:KUBE-SEP-YHSEP23J6IVZKCOG - [0:0]
+-A KUBE-SEP-YHSEP23J6IVZKCOG -s 20.2.36.78/32 -m comment --comment "default/service-hellok8s-clusterip" -j KUBE-MARK-MASQ
+-A KUBE-SEP-YHSEP23J6IVZKCOG -p tcp -m comment --comment "default/service-hellok8s-clusterip" -m tcp -j DNAT --to-destination 20.2.36.78:3000
+-A KUBE-SVC-BRULDGNIV2IQDBPU -m comment --comment "default/service-hellok8s-clusterip -> 20.2.36.78:3000" -j KUBE-SEP-YHSEP23J6IVZKCOG
+
+$ kk get pods -o wide
+NAME                                READY   STATUS    RESTARTS   AGE   IP           NODE        NOMINATED NODE   READINESS GATES
+hellok8s-go-http-6bb87f8cb5-dstff   1/1     Running   0          53m   20.2.36.77   k8s-node1   <none>           <none>
+hellok8s-go-http-6bb87f8cb5-wtdht   1/1     Running   0          52m   20.2.36.78   k8s-node1   <none>           <none>
+```
+
+
+
+可以看到链`KUBE-SEP-YHSEP23J6IVZKCOG`的规则之一就是将转入的流量全部转发到目标`20.2.36.78:3000` ，这个 IP 也是名字为`hellok8s-go-http-6bb87f8cb5-wtdht`的 Pod 的内部 IP。
+
+
+
+### 7.3 Service 类型之 NodePort
+
+ClusterIP 只能在集群内访问 Pod 服务，而 NodePort 则进一步将服务暴露到集群节点的静态端口上，可以认为 NodePort 是 ClusterIP 的增强模式。
+
+比如 k8s 集群有 2 个节点：node1 和 node2，暴露后就可以通过 `node1-ip:port` 或 `node2-ip:port` 的方式来稳定访问 Pod 服务。
+
+操作步骤：
+
+1. 定义 [service-nodeport.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/service-nodeport.yaml)，并应用；
+2. 通过访问 k8s 集群中的任一节点 ip+端口进行验证
+
+具体指令如下：
+
+```
+# 同样会分配一个 cluster-ip
+$ kk get svc service-hellok8s-nodeport                   
+NAME                        TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
+service-hellok8s-nodeport   NodePort    20.1.252.217   <none>        3000:30000/TCP   79s
+
+# 在节点10.0.2.2 上访问 本机端口 以及 节点 10.0.2.3:30000
+# - 同样每个ip访问2次验证负载均衡功能
+$ curl 10.0.2.2:30000
+[v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-hx7pv
+$ curl 10.0.2.2:30000
+[v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-4bddw
+
+$ curl 10.0.2.3:30000
+[v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-hx7pv
+$ curl 10.0.2.3:30000
+[v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-4bddw
+```
+
+
+
+### 7.4 Service 类型之 LoadBalancer
+
+上一节的 NodePort 是通过节点端口的方式向外暴露服务，这其实已经距离集群外访问服务只有一步之遥了。此时我们有两种方式在集群外访问服务：
+
+- 第一种是比较简单的方式：使用节点的公网 IP 进行访问（将节点 IP 配置到域名 A 记录同理）
+- 第二种是比较稳妥的方式：单独部署一套负载均衡服务（它会再提供一个 VIP 供外部访问），负责将集群外部的流量转发到集群内部。
+  - 负载均衡服务一般是做四层转发（大部分也支持七层转发），主要作用是防 DDos 攻击以及提高应用并发的能力。
+  - 现代云厂商一般都有提供软件负载均衡服务产品，并且支持按需的防 DDos 攻击能力、跨地区容灾等 Nginx 具备或不具备的能力。
+
+LoadBalancer 正是通过使用云厂商提供的负载均衡器（Service LoadBalancer，一般叫做 SLB）的高可用方式向外暴露服务。 负载均衡器将集群外的流量转发到集群内的 Node，后者再基于 ClusterIP 的方式转发到 Pod。可以说 LoadBalancer 是 NodePort 的进一步增强。
+
+假如你在 AWS 的 EKS 集群上创建一个 Type 为 `LoadBalancer` 的 Service。它会自动创建一个 ELB (Elastic Load Balancer) ，并可以根据配置的 IP 池中自动分配一个独立的 IP 地址，可以供外部访问。
+
+这一步由于没有条件，不再演示。LoadBalancer 架构图如下：
+
+![k8s-loadbalancer](C:\Users\15618\Pictures\K8S\k8s-loadbalancer.png)
+
+从架构图可看出，`LoadBalancer`是基于 NodePort 的一种 Service，这里提供模板供参考：[service-loadbalancer.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/service-loadbalancer.yaml)
+
+所以如果是使用公有云托管的 k8s 集群，那么通常也会使用它们提供的 SLB 服务。若是自己搭建的集群， 那么一般也不会使用`LoadBalancer`（私有集群一般也不支持`LoadBalancer`）。
+
+Note
+
+LoadBalancer 类型的 Service 本质上是由云厂商提供具体实现，大部分云厂商都支持四层和七层协议代理。
+
+- [阿里云使用私网 SLB 教程](https://help.aliyun.com/zh/ack/ack-managed-and-ack-dedicated/user-guide/configure-an-ingress-controller-to-use-an-internal-facing-slb-instance?spm=a2c4g.11186623.0.0.5d1736e0l59zqg)
+
+
+
+### 7.5 Service 类型之 Headless
+
+这是一种特殊的 Service 类型，它不为整个服务分配任何集群 IP，而是通过分配的 DNS 域名来访问 Pod 服务。由于没有 Cluster IP，所以节点和集群外都无法直接访问 Service（但可以在节点直接访问 Pod IP）。无头 Service 主要提供给 StatefulSet（如数据库集群）使用。
+
+操作步骤：
+
+1. 定义 [service-clusterip-headless.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/service-clusterip-headless.yaml)，并应用；
+2. 定义 [pod_curl.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/pod_curl.yaml) 并应用（具有 curl 和 nslookup 命令），用来作为 client 访问定义好的 service;
+3. 进入 curl 容器，使用 curl 和 nslookup 命令进行访问测试；
+
+具体指令如下：
+
+```
+kk apply -f service-clusterip-headless.yaml
+
+kk apply -f pod_curl.yaml
+
+# 进入curl容器
+kk exec -it curl -- /bin/sh
+# 访问测试
+/ # curl service-hellok8s-clusterip-headless.default.svc.cluster.local:3000
+[v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-57r86
+/ # curl service-hellok8s-clusterip-headless.default.svc.cluster.local:3000
+[v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-lgtgf
+
+# CNAME记录查询
+/ # nslookup service-hellok8s-clusterip-headless.default.svc.cluster.local
+nslookup: can't resolve '(null)': Name does not resolve
+
+Name:      service-hellok8s-clusterip-headless.default.svc.cluster.local
+Address 1: 20.2.36.77 20-2-36-77.service-hellok8s-clusterip-headless.default.svc.cluster.local
+Address 2: 20.2.36.78 20-2-36-78.service-hellok8s-clusterip-headless.default.svc.cluster.local
+```
+
+
+
+这里的`service-hellok8s-clusterip-headless.default.svc.cluster.local`就是 Service 提供给集群内部访问 Pod 组的域名， 组成方式为`{ServiceName}.{Namespace}.svc.{ClusterDomain}`，其中 ClusterDomain 表示集群域，默认为`cluster.local`， `Namespace`在 Service 的 yaml 文件中未指定那就是 default。
+
+在上述操作中，我们通过 curl 进行了访问测试，可以看到没问题，但是并不提供负载均衡功能，读者可多访问几次进行观察。 然后我们通过 nslookup 查看域名的 DNS 信息，可以看到 Service 域名指向两个 Pod IP，并且它们还有对应的专有域名，但因为 Pod IP 非固定， 所以这个专有域名也没任何作用。
+
+除了直接调用域名访问服务之外，还可解析域名来根据需求决定访问哪个 Pod。这种方式更适合 StatefulSet 产生的有状态 Pod。
+
+
+
+### 7.6 Service 类型之 ExternalName
+
+ExternalName 也是 k8s 中一个特殊的 Service 类型，它不需要设置 selector 去选择为哪些 pod 实例提供服务，而是使用 DNS CNAME 机制把 svc 指向另外一个域名，这个域名可以是任何能够访问的虚拟地址（不能是 IP）， 比如`mysql.db.svc`这样的建立在 db 命名空间内的 mysql 服务，也可以指定`www.baidu.com`这样的外部真实域名。
+
+比如可以定义一个 service 指向 `www.baidu.com`，然后可以在集群内的任何一个 pod 上访问这个 service 的域名， 请求 service 域名将自动重定向到`www.baidu.com`。
+
+注意: ExternalName 这个类型也仅在集群内（不含节点本地）可访问。
+
+操作步骤：
+
+1. 定义 [service-externalname.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/service-externalname.yaml)，并应用
+2. 进入上一节中准备好的 curl 容器，使用 curl 和 nslookup 命令进行访问测试；
+
+具体指令如下：
+
+```
+$ kk apply -f service-externalname.yaml
+
+# 进入curl容器
+$ kk exec -it curl -- /bin/sh          
+/ # ping service-hellok8s-externalname.default.svc.cluster.local
+PING service-hellok8s-externalname.default.svc.cluster.local (14.119.104.254): 56 data bytes
+64 bytes from 14.119.104.254: seq=0 ttl=54 time=9.353 ms
+64 bytes from 14.119.104.254: seq=1 ttl=54 time=9.278 ms
+^C
+--- service-hellok8s-externalname.default.svc.cluster.local ping statistics ---
+2 packets transmitted, 2 packets received, 0% packet loss
+round-trip min/avg/max = 9.278/9.315/9.353 ms
+/ # nslookup service-hellok8s-externalname.default.svc.cluster.local
+nslookup: can't resolve '(null)': Name does not resolve
+
+Name:      service-hellok8s-externalname.default.svc.cluster.local
+Address 1: 14.119.104.189
+Address 2: 14.119.104.254
+Address 3: 240e:ff:e020:37::ff:b08c:124f
+Address 4: 240e:ff:e020:38::ff:b06d:569b
+
+
+# curl 访问：打印状态码
+$ curl -s -o /dev/null -H 'Host:www.baidu.com' http://service-hellok8s-externalname.default.svc.cluster.local -w "%{http_code}\n"
+200
+
+# curl 访问：打印状态码（不带Host头）
+$ curl -s -o /dev/null http://service-hellok8s-externalname.default.svc.cluster.local -w "%{http_code}\n"
+403
+
+# curl 访问：只打印html的title
+curl -s -H 'Host:www.baidu.com' http://service-hellok8s-externalname.default.svc.cluster.local |grep -oE '<title>.*?</title>'
+<title>百度一下，你就知道</title>
+```
+
+
+
+Important
+
+这里需要加`-H 'Host:www.baidu.com'` 才能通过代理服务器的 Host 请求头验证，以正常访问 Web 页面，否则 403。
+
+**用途说明**：ExternalName 这类 Service 一般用在集群内部需要调用外部服务的时候，比如云服务商托管的 DB 等服务。
+
+**无头 Service + Endpoints**
+另外，很多时候，比如是自己部署的 DB 服务，只有 IP 而没有域名，ExternalName 无法实现这个需求，需要使用`无头Service`+`Endpoints`来实现， 这里提供一个测试通过的模板 [service-headless-endpoints.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/service-headless-endpoints.yaml) 供读者自行练习。
+
+Note
+
+Endpoints 对象一般不需要手动创建，Service controller 会在 service 创建时自动创建，只有在需要关联集群外的服务时可能用到。 这个时候就可定义 Endpoints 模板，其中填入外部服务的 IP 和端口，然后应用即可。如果集群外的服务提供的地址是域名而不是 IP，则使用 ExternalName。
+
+
+
+### 7.7 搭配 ExternalIP
+
+前面小节介绍的 ClusterIP（含 Headless）/NodePort/LoadBalancer/ExternalName 五种 Service 都可以搭配 ExternalIP 使用， ExternalIP 是 Service 模板中的一个配置字段，位置是`spec.externalIP`。配置此字段后，在原模板提供的功能基础上， 还可以将 Service 注册到指定的 ExternalIP（通常是节点网段内的空闲 IP）上，从而增加 Service 的一种暴露方式。
+
+这里提供一个测试通过的模板 [service-clusterip-externalip.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/service-clusterip-externalip.yaml) 给读者自行练习。
+
+`spec.externalIP`可以配置为任意局域网 IP，而不必是节点网段内的 ip，Service Controller 会自动为每个节点添加路由。
+
+注意：设置`spec.externalIP`时要选择一个当前网络中没有使用以及以后大概率也不会使用的 IP（例如`192.168.255.100`）， 避免在访问 Service 时出现乌龙。
+
+
+
+### 7.8 服务发现
+
+k8s 支持下面两种服务发现方式：
+
+- kube-dns（推荐）
+- 环境变量
+
+
+
+#### 7.8.1 kube-dns
+
+如果你足够细心，你可能已经发现了`kube-system`空间下有个名为`kube-dns`的 service，这个 service 就是 k8s 内置的 DNS 组件， 它用来为集群中所有 Pod 提供**服务发现**功能。这个 service 通过 selector   **`k8s-app=kube-dns`**关联了名为`coredns`的 Pod 组。
+
+```
+$ kk get pod,deployment,svc  -n kube-system |grep dns
+pod/coredns-c676cc86f-4vzdl                    1/1     Running   1 (2d14h ago)       2d17h
+pod/coredns-c676cc86f-v8s8k                    1/1     Running   1 (2d14h ago)       2d17h
+deployment.apps/coredns                   2/2     2            2           2d18h
+service/kube-dns   ClusterIP   20.1.0.10    <none>        53/UDP,53/TCP,9153/TCP   2d18h
+```
+
+
+
+k8s 通过每个节点部署的 kubelet 组件向每个新启动的 Pod 注入 DNS 配置（通过`/etc/resolv.conf`），从而实现服务发现。这里随意选择一个 Pod， 查看 DNS 配置。
+
+```
+$ kk exec -it hellok8s-go-http-6bb87f8cb5-c6bvs --  cat /etc/resolv.conf 
+search default.svc.cluster.local svc.cluster.local cluster.local
+nameserver 20.1.0.10
+options ndots:5
+```
+
+
+
+详细解释这个配置：
+
+- `search default.svc.cluster.local svc.cluster.local cluster.local`
+  这一行定义了 DNS 搜索域。它告诉 DNS 解析器，如果在域名中没有明确指定的主机名，那么应该依次尝试附加这些搜索域来查找主机名。 在这种情况下，如果你尝试解析一个名为 example 的主机名，DNS 解析器会首先尝试 example.default.svc.cluster.local， 然后是 example.svc.cluster.local，最后是 example.cluster.local。这对于 Kubernetes 集群中的服务发现非常有用， 因为它允许你使用短名称来引用服务，而不必指定完整的域名。
+- `nameserver 20.1.0.10`
+  这一行指定了要使用的 DNS 服务器的 IP 地址（对应`kube-dns`的 ClusterIP）。在这种情况下，DNS 解析器将查询由 IP 地址`20.1.0.10` 指定的 DNS 服务器（即`pod/coredns`）来解析域名。
+- `options ndots:5`
+  这一行定义了 DNS 解析选项。ndots 是一个数字，表示 DNS 解析器应该在域名中查找多少次点（.）以确定绝对域名。在这种情况下， ndots:5 表示如果一个域名中包含至少 5 个点，则 DNS 解析器会将它视为绝对域名，否则会依次附加搜索域来查找主机名。
+
+比如现在有如下部署：
+
+```
+$ kk get pod,svc                                                       
+NAME                                    READY   STATUS    RESTARTS   AGE
+pod/hellok8s-go-http-6bb87f8cb5-c6bvs   1/1     Running   0          3h7m
+pod/hellok8s-go-http-6bb87f8cb5-g8fmd   1/1     Running   0          3h7m
+
+NAME                                 TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
+service/kubernetes                   ClusterIP   20.1.0.1       <none>        443/TCP    3h36m
+service/service-hellok8s-clusterip   ClusterIP   20.1.151.162   <none>        3000/TCP   3h33m
+```
+
+
+
+那么`service-hellok8s-clusterip`就是一个集群内有效的虚拟主机名（指向两个`hellok8s-go-http`Pod），我们可以启动一个`curl` 容器来测试：
+
+```
+$ kk apply -f pod_curl.yaml                           
+pod/curl created
+$ kk exec -it curl --  curl service-hellok8s-clusterip:3000      
+[v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-g8fmd
+```
+
+
+
+有了内置的服务发现功能，我们在部署微服务项目时就无需再单独部署如 consul 这样的服务发现组件了，节省了不少的开发及维护工作。
+
+
+
+#### 7.8.2 环境变量
+
+在每个新启动的 Pod 中，kubelet 也会向其以环境变量形式注入**当前 Namespace**中已存在的 Service 连接信息，Pod 可以通过这些环境变量来发现其他 Service 的 IP 地址。 这里假设已经启动了`service/service-hellok8s-clusterip`，然后重新启动`pod/curl` ，然后在后者 shell 中查看`service/service-hellok8s-clusterip`的环境变量：
+
+```
+$ kk exec -it curl --  printenv |grep HELLOK8S
+SERVICE_HELLOK8S_CLUSTERIP_PORT_3000_TCP_PORT=3000
+SERVICE_HELLOK8S_CLUSTERIP_PORT_3000_TCP=tcp://20.1.151.162:3000
+SERVICE_HELLOK8S_CLUSTERIP_PORT_3000_TCP_ADDR=20.1.151.162
+SERVICE_HELLOK8S_CLUSTERIP_SERVICE_HOST=20.1.151.162
+SERVICE_HELLOK8S_CLUSTERIP_PORT=tcp://20.1.151.162:3000
+SERVICE_HELLOK8S_CLUSTERIP_SERVICE_PORT=3000
+SERVICE_HELLOK8S_CLUSTERIP_PORT_3000_TCP_PROTO=tcp
+```
+
+
+
+所以此时我们也可以通过 env 的方式访问`service/service-hellok8s-clusterip`：
+
+```
+$ kk exec -it curl --  sh                                                                                    
+/ # curl $SERVICE_HELLOK8S_CLUSTERIP_SERVICE_HOST:$SERVICE_HELLOK8S_CLUSTERIP_SERVICE_PORT
+[v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-g8fmd
+```
+
+
+
+但是，环境变量方式对资源的创建顺序有要求。比如`pod/curl`先启动，某个 service 后创建，那么启动后的`pod/curl` 中就不会有这个 Service 相关的环境变量。 所以这里不推荐使用环境变量的方式访问 Service，而是推荐使用内置 DNS 的方式。
+
+**关闭 Service Env 注入**
+通过上面内容我们可以估算到，在一个 Namespace 中若存在 1000 个 Service，就会给新创建的 Pod 注入 7000 个 Env 变量。 巨多的 Env 变量会导致某些编程语言开发的应用所运行的容器崩溃（也可能表现为容器的 CPU/内存占用高），比如 Java，Nodejs 等。 所以我们可以在创建 Pod 时，通过设置`spec.enableServiceLinks: false`参数来关闭 Service Env 注入。
+
+关闭 Service Env 注入不会影响模板中的其他 Env 变量注入。
+
+参考:
+
+- [K8s 一条默认参数引起的性能问题](https://mp.weixin.qq.com/s/w6ufHeQqf4I2IygJ_yg9zg)
+- [Set enableServiceLinks to false as default](https://github.com/kubernetes/kubernetes/issues/121787)
+
+
 
