@@ -707,9 +707,7 @@ K8s 集群节点拥有 Master 和 Node 两种角色。它们的职责如下：
 
 K8s 架构图如下：
 
-![k8s-arch](C:\Users\15618\Pictures\K8S\k8s-arch.jpg)
-
-
+![image](https://github.com/VioletEvergardenZz/K8S/blob/main/K8S/k8s-arch.jpg)
 
 ### 1.2 Master
 
