@@ -764,7 +764,7 @@ kubelet 会定期调用 Master 节点上的 API Server 的 REST API 以报告自
 
 k8s 的对象模型图如下：
 
-![k8s-object-model](C:\Users\15618\Pictures\K8S\k8s-object-model.jpg)
+![k8s-object-model](https://github.com/VioletEvergardenZz/K8S/blob/main/K8S/k8s-object-model.jpg)
 
 **Pod**
 Pod 是 k8s 调度的**基本单元**，它封装了一个或多个容器。Pod 中的容器会作为一个整体被 k8s 调度到一个 Node 上运行。
@@ -2159,7 +2159,7 @@ LoadBalancer 正是通过使用云厂商提供的负载均衡器（Service LoadB
 
 这一步由于没有条件，不再演示。LoadBalancer 架构图如下：
 
-![k8s-loadbalancer](C:\Users\15618\Pictures\K8S\k8s-loadbalancer.png)
+![k8s-loadbalancer](https://github.com/VioletEvergardenZz/K8S/blob/main/K8S/k8s-loadbalancer.png)
 
 从架构图可看出，`LoadBalancer`是基于 NodePort 的一种 Service，这里提供模板供参考：[service-loadbalancer.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/service-loadbalancer.yaml)
 
