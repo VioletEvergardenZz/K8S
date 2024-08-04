@@ -1215,3 +1215,528 @@ Pod 中的容器所看到的系统主机名与为 Pod 名称相同。
 
 
 
+## 4. 使用 Deployment
+
+通常，Pod 不会被直接创建和管理，而是由更高级别的控制器，例如 Deployment 来创建和管理。 这是因为控制器提供了更强大的**应用程序管理功能**。
+
+- **应用管理**：Deployment 是 Kubernetes 中的一个控制器，用于管理应用程序的部署和更新。它允许你定义应用程序的期望状态，然后确保集群中的副本数符合这个状态。
+
+- **自愈能力**：Deployment 可以自动修复故障，如果 Pod 失败，它将启动新的 Pod 来替代。这有助于确保应用程序的高可用性。
+
+- **滚动更新**：Deployment 支持滚动更新，允许你逐步将新版本的应用程序部署到集群中，而不会导致中断。
+
+- **副本管理**：Deployment 负责管理 Pod 的副本，可以指定应用程序需要的副本数量，Deployment 将根据需求来自动调整。
+
+- **声明性配置**：Deployment 的配置是声明性的，你只需定义所需的状态，而不是详细指定如何实现它。Kubernetes 会根据你的声明来管理应用程序的状态。
+
+  
+
+### 4.1 部署 deployment
+
+下面使用 [deployment.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/deployment.yaml) 作为示例进行演示：
+
+```
+$ kk apply -f deployment.yaml
+deployment.apps/hellok8s-go-http created
+
+# 查看启动的pod
+$ kk get deployments                
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+hellok8s-go-http   2/2     2            2           3m
+```
+
+
+
+还可以查看 pod 运行的 node：
+
+```
+# 这里的IP是pod ip，属于部署k8s集群时规划的pod网段
+# NODE就是集群中的node名称
+$ kk get pod -o wide
+NAME                                READY   STATUS    RESTARTS   AGE   IP           NODE        NOMINATED NODE   READINESS GATES
+hellok8s-go-http-55cfd74847-5jw7f   1/1     Running   0          68s   20.2.36.75   k8s-node1   <none>           <none>
+hellok8s-go-http-55cfd74847-zlf49   1/1     Running   0          68s   20.2.36.74   k8s-node1   <none>           <none>
+```
+
+
+
+删除 pod 会自动重启一个新的 Pod，确保可用的 pod 数量与`deployment.yaml`中的`replicas`字段保持一致，不再演示。
+
+
+
+### 4.2 修改 deployment
+
+修改方式仍然支持修改模板文件和使用`patch`命令两种。 现在以修改模板中的`replicas=3`为例进行演示。为了能够观察 pod 数量变化过程，提前打开一个终端执行`kk get pods --watch`命令。 下面是演示情况：
+
+```
+# --watch可简写为-w
+$ kk get pods --watch
+NAME                                READY   STATUS    RESTARTS   AGE
+hellok8s-go-http-58cb496c84-cft9j   1/1     Running   0          4m7s
+
+
+# 在另一个终端执行patch命令
+# kk patch deployment hellok8s-go-http -p '{"spec":{"replicas": 3}}'
+
+hellok8s-go-http-58cb496c84-sdrt2   0/1     Pending   0          0s
+hellok8s-go-http-58cb496c84-sdrt2   0/1     Pending   0          0s
+hellok8s-go-http-58cb496c84-pjkp9   0/1     Pending   0          0s
+hellok8s-go-http-58cb496c84-pjkp9   0/1     Pending   0          0s
+hellok8s-go-http-58cb496c84-sdrt2   0/1     ContainerCreating   0          0s
+hellok8s-go-http-58cb496c84-pjkp9   0/1     ContainerCreating   0          0s
+hellok8s-go-http-58cb496c84-pjkp9   1/1     Running             0          1s
+hellok8s-go-http-58cb496c84-sdrt2   1/1     Running             0          1s
+```
+
+
+
+最后，你可以通过`kk get pods`命令观察到 Deployment 管理下的 pod 副本数量为 3。
+
+我们可以在 Deployment 创建后修改它的部分字段，比如标签、副本数以及容器模板。其中修改容器模板会触发 Deployment 管理的所有 Pod 更新。
+
+
+
+### 4.3 更新 deployment
+
+这一步通过修改 main.go 来模拟实际项目中的服务更新，修改后的文件是 [main2.go](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/main2.go)。
+
+重新构建&推送镜像：
+
+```
+docker build . -t xiaoxiao/hellok8s:v2
+docker push leigg/hellok8s:v2
+```
+
+
+
+然后更新 deployment：
+
+```
+# set image是一种命令式的更新操作，是一种临时性的操作方式，会导致当前状态与YAML清单定义不一致，生产环境中不推荐
+# 生产环境推荐通过修改YAML清单再apply的方式进行更新
+$ kk set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:v2
+
+$ # 查看更新过程（如果镜像已经拉取，此过程会很快，你可能只会看到最后一条输出）
+$ kk rollout status deployment/hellok8s-go-http
+Waiting for deployment "hellok8s-go-http" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "hellok8s-go-http" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "hellok8s-go-http" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "hellok8s-go-http" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "hellok8s-go-http" rollout to finish: 1 old replicas are pending termination...
+deployment "hellok8s-go-http" successfully rolled out
+
+# 也可以直接查看pod信息，会观察到pod正在更新（这是一个启动新pod，删除旧pod的过程，最终会维持到所配置的replicas数量）
+$ kk get po -w
+NAMESPACE     NAME                                       READY   STATUS              RESTARTS      AGE
+default       go-http                                    1/1     Running             0             14m
+default       hellok8s-go-http-55cfd74847-5jw7f          1/1     Terminating         0             3m
+default       hellok8s-go-http-55cfd74847-z29dl          1/1     Running             0             3m
+default       hellok8s-go-http-55cfd74847-zlf49          1/1     Running             0             3m
+default       hellok8s-go-http-668c7f75bd-m56pm          0/1     ContainerCreating   0             0s
+default       hellok8s-go-http-668c7f75bd-qlrk5          1/1     Running             0             14s
+
+# 绑定其中一个pod来测试（这是一个阻塞终端的操作）
+$ kk port-forward hellok8s-go-http-668c7f75bd-m56pm 3000:3000
+Forwarding from 127.0.0.1:3000 -> 3000
+Forwarding from [::1]:3000 -> 3000
+```
+
+
+
+在另一个会话窗口执行
+
+```
+$ curl http://localhost:3000
+[v2] Hello, Kubernetes!
+```
+
+
+
+这里演示的更新是容器更新，修改其他属性也属于更新。
+
+通过`kk get deploy -o wide`或`kk describe deploy ...`命令可以查看 Pod 内每个容器使用的镜像名称（含版本）。
+
+Deployment 的镜像**更新或回滚**都是通过 **创建新的 ReplicaSet 和终止旧的 ReplicaSet** 来完成的，你可以通过`kk get rs -w` 来观察这一过程。 在更新完成后，应当看到新旧 ReplicaSet 是同时存在的：
+
+```
+$ kk get rs -o wide
+NAME                          DESIRED   CURRENT   READY   AGE     CONTAINERS   IMAGES              SELECTOR
+hellok8s-go-http-55cfd74847   0         0         0       7m50s   hellok8s     leigg/hellok8s:v1   app=hellok8s,pod-template-hash=55cfd74847
+hellok8s-go-http-668c7f75bd   3         3         3       6m23s   hellok8s     leigg/hellok8s:v2   app=hellok8s,pod-template-hash=668c7f75bd
+```
+
+
+
+**注意** ：k8s 使用旧的 ReplicaSet 作为 Deployment 的更新历史，回滚时会用到，所以请不要手动删除旧的 ReplicaSet。通过`kubectl rollout history deployment/hellok8s-go-http` 可以查看上线历史：
+
+```
+$ kk rollout history deployment/hellok8s-go-http                              
+deployment.apps/hellok8s-go-http 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+```
+
+
+
+其中`CHANGE-CAUSE`列是更新原因，可以通过以下命令设置当前运行版本（REVISION）的备注：
+
+```plain
+$ kubectl annotate deployment/hellok8s-go-http kubernetes.io/change-cause="image updated to v2"    
+deployment.apps/hellok8s-go-http annotated
+
+$ kk rollout history deployment/hellok8s-go-http                                               
+deployment.apps/hellok8s-go-http 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         image updated to v2
+```
+
+
+
+只有当 Deployment 的`.spec.template`部分发生变更时才会创建新的 REVISION，如果只是 Pod 数量变化或 Deployment 标签修改，则不会创建新的 REVISION。
+
+
+
+### 4.4 回滚部署
+
+如果新的镜像无法正常启动，则旧的 pod 不会被删除，但需要回滚，使 deployment 回到正常状态。
+
+按照下面的步骤进行：
+
+1. 修改 main.go 为 [main_panic.go](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/main_panic.go) ；
+2. 构建镜像: `docker build . -t xiaoxiao/hellok8s:v2_problem`
+3. push 镜像：`docker push xiaoxiao/hellok8s:v2_problem`
+4. 更新 deployment 使用的镜像：`kk set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:v2_problem`
+5. 观察：`kk rollout status deployment/hellok8s-go-http` （会停滞，按 Ctrl-C 停止观察）
+6. 观察 pod：`kk get pods`
+
+```
+$ kk get pods
+NAME                                READY   STATUS             RESTARTS     AGE
+go-http                             1/1     Running            0            36m
+hellok8s-go-http-55cfd74847-fv2kp   1/1     Running            0            17m
+hellok8s-go-http-55cfd74847-l78pb   1/1     Running            0            17m
+hellok8s-go-http-55cfd74847-qtb59   1/1     Running            0            17m
+hellok8s-go-http-7c9d684dd-msj2c    0/1     CrashLoopBackOff   1 (4s ago)   6s
+
+# CrashLoopBackOff状态表示重启次数过多，过一会儿再试，这表示pod内的容器无法正常启动，或者启动就立即退出了
+
+# 查看每个副本集每次更新的pod情况（包含副本数量、上线时间、使用的镜像tag）
+# DESIRED-预期数量，CURRENT-当前数量，READY-可用数量
+# -l 进行标签筛选
+$ kk get rs -l app=hellok8s -o wide
+NAME                          DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES                      SELECTOR
+hellok8s-go-http-55cfd74847   0         0         0       76s   hellok8s     xiaoxiao/hellok8s:v1           app=hellok8s,pod-template-hash=55cfd74847
+hellok8s-go-http-668c7f75bd   3         3         3       55s   hellok8s     xiaoxiao/hellok8s:v2           app=hellok8s,pod-template-hash=668c7f75bd
+hellok8s-go-http-7c9d684dd    1         1         0       11s   hellok8s     xiaoxiao/hellok8s:v2_problem   app=hellok8s,pod-template-hash=7c9d684dd
+```
+
+
+
+现在进行回滚：
+
+```
+# 先查看deployment更新记录
+$ kk rollout history deployment/hellok8s-go-http               
+deployment.apps/hellok8s-go-http 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         image updated to v2
+3         <none>
+
+# 现在回到revision 2，可以先查看它具体信息（主要确认用的哪个镜像tag）
+$ kk rollout history deployment/hellok8s-go-http --revision=2
+deployment.apps/hellok8s-go-http with revision #2
+Pod Template:
+  Labels:	app=hellok8s
+	pod-template-hash=668c7f75bd
+  Containers:
+   hellok8s:
+    Image:	leigg/hellok8s:v2
+    Port:	<none>
+    Host Port:	<none>
+    Environment:	<none>
+    Mounts:	<none>
+  Volumes:	<none>
+
+# 确认后再回滚（若不指定--to-revision=N，则是回到上个版本）
+$ kk rollout undo deployment/hellok8s-go-http        
+deployment.apps/hellok8s-go-http rolled back
+
+# 检查副本集状态（所处的版本）
+$ kk get rs -l app=hellok8s -o wide                                
+hellok8s-go-http-55cfd74847   0         0         0       9m31s   hellok8s     leigg/hellok8s:v1           app=hellok8s,pod-template-hash=55cfd74847
+hellok8s-go-http-668c7f75bd   3         3         3       9m10s   hellok8s     leigg/hellok8s:v2           app=hellok8s,pod-template-hash=668c7f75bd
+hellok8s-go-http-7c9d684dd    0         0         0       8m26s   hellok8s     leigg/hellok8s:v2_problem   app=hellok8s,pod-template-hash=7c9d684dd
+
+# 恢复正常
+$ kk get deployments hellok8s-go-http
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+hellok8s-go-http   3/3     3            3           7m42s
+```
+
+
+
+### 4.5 滚动更新（Rolling Update）
+
+k8s 1.15 版本起支持滚动更新，即先创建新的 pod，创建成功后再删除旧的 pod，确保更新过程无感知，大大降低对业务影响。
+
+在 deployment 的资源定义中, spec.strategy.type 有两种选择:
+
+- RollingUpdate: 逐渐增加新版本的 pod，逐渐减少旧版本的 pod。（常用）
+- Recreate: 在新版本的 pod 增加前，先将所有旧版本 pod 删除（针对那些不能多进程部署的服务）
+
+另外，还可以通过以下字段来控制升级 pod 的速率：
+
+- maxSurge: 最大峰值，用来指定可以创建的超出期望 Pod 个数的 Pod 数量。
+- maxUnavailable: 最大不可用，用来指定更新过程中不可用的 Pod 的个数上限。
+
+如果不设置，deployment 会有默认的配置：
+
+```
+$ kk describe -f deployment.yaml
+Name:                   hellok8s-go-http
+Namespace:              default
+CreationTimestamp:      Sun, 13 Aug 2023 21:09:33 +0800
+Labels:                 <none>
+Annotations:            deployment.kubernetes.io/revision: 1
+Selector:               app=aaa,app1=hellok8s
+Replicas:               3 desired | 3 updated | 3 total | 3 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge # <------ 看这
+省略。。。
+```
+
+
+
+为了明确地指定 deployment 的更新方式，我们需要在 yaml 中配置：
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hellok8s-go-http
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  replicas: 3
+省略其他熟悉的配置项。。。
+```
+
+
+
+这样，我们通过`kk apply`命令时会以滚动更新方式进行。
+
+从`maxSurge: 1`可以看出更新时最多会出现 4 个 pod，从`maxUnavailable: 1`可以看出最少会有 2 个 pod 正常运行。
+
+注意：无论是通过`kk set image ...`还是`kk rollout restart deployment xxx`方式更新 deployment 都会遵循配置进行滚动更新。
+
+
+
+### 4.6 控制 Pod 水平伸缩
+
+```
+# 指定副本数量
+$ kk scale deployment/hellok8s-go-http --replicas=10
+deployment.apps/hellok8s-go-http scaled
+
+# 观察到副本集版本并没有变化，而是数量发生变化
+$ kk get rs -l app=hellok8s -o wide                 
+NAME                          DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES                      SELECTOR
+hellok8s-go-http-55cfd74847   0         0         0       33m   hellok8s     leigg/hellok8s:v1           app=hellok8s,pod-template-hash=55cfd74847
+hellok8s-go-http-668c7f75bd   10        10        10      33m   hellok8s     leigg/hellok8s:v2           app=hellok8s,pod-template-hash=668c7f75bd
+hellok8s-go-http-7c9d684dd    0         0         0       32m   hellok8s     leigg/hellok8s:v2_problem   app=hellok8s,pod-template-hash=7c9d684dd
+```
+
+
+
+### 4.7 存活探针 (livenessProb)
+
+存活探测器来确定**什么时候要重启容器**。 例如，存活探测器可以探测到应用死锁（应用程序在运行，但是无法继续执行后面的步骤）情况。 重启这种状态下的容器有助于提高应用的可用性，即使其中存在缺陷。
+
+下面更新 app 代码为[main_liveness.go](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/main_liveness.go)，并且构建新的镜像以及推送到远程仓库：
+
+```
+docker build . -t xiaoxaio/hellok8s:liveness
+docker push xiaoxiao/hellok8s:liveness
+```
+
+
+
+然后在 deployment.yaml 内添加存活探针配置：
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # deployment唯一名称
+  name: hellok8s-go-http
+spec:
+  replicas: 2 # 副本数量
+  selector:
+    matchLabels:
+      app: hellok8s # 管理template下所有 app=hellok8s的pod，（要求和template.metadata.labels完全一致！！！否则无法部署deployment）
+  template: # template 定义一组pod
+    metadata:
+      labels:
+        app: hellok8s
+    spec:
+      containers:
+        - image: leigg/hellok8s:v1
+          name: hellok8s
+          # 存活探针
+          livenessProbe:
+            # http get 探测指定pod提供HTTP服务的路径和端口
+            httpGet:
+              path: /healthz
+              port: 3000
+            # 3s后开始探测
+            initialDelaySeconds: 3
+            # 每3s探测一次
+            periodSeconds: 3
+```
+
+
+
+更新 deployment：
+
+```
+kk apply -f deployment.yaml
+kk set image deployment/hellok8s-go-http hellok8s=xiaoxaio/hellok8s:liveness
+```
+
+
+
+现在 pod 将在 15s 后一直重启：
+
+```
+$ kk get pods
+NAME                                READY   STATUS    RESTARTS      AGE
+hellok8s-go-http-7d948dfc79-jwjrm   1/1     Running   2 (10s ago)   58s
+hellok8s-go-http-7d948dfc79-wpk2d   1/1     Running   2 (11s ago)   59s
+
+
+#可以看到探针失败原因
+$ kk describe pod hellok8s-go-http-7d948dfc79-wpk2d
+...
+Events:
+  Type     Reason     Age                 From               Message
+  ----     ------     ----                ----               -------
+  Normal   Scheduled  113s                default-scheduler  Successfully assigned default/hellok8s-go-http-7d948dfc79-wpk2d to k8s-node1
+  Normal   Pulled     41s (x4 over 113s)  kubelet            Container image "leigg/hellok8s:liveness" already present on machine
+  Normal   Created    41s (x4 over 113s)  kubelet            Created container hellok8s
+  Normal   Started    41s (x4 over 113s)  kubelet            Started container hellok8s
+  Normal   Killing    41s (x3 over 89s)   kubelet            Container hellok8s failed liveness probe, will be restarted
+  Warning  Unhealthy  23s (x10 over 95s)  kubelet            Liveness probe failed: HTTP probe failed with statuscode: 500
+```
+
+
+
+还有其他探测方式，比如 TCP、gRPC、Shell 命令。
+
+[官方文档](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
+
+
+
+### 4.8 就绪探针 (readiness)
+
+就绪探测器可以知道**容器何时准备好接受请求流量**，当一个 Pod 内的所有容器都就绪时，才能认为该 Pod 就绪。 这种信号的一个用途就是控制哪个 Pod 作为 Service 的后端。若 Pod 尚未就绪，会被从 Service 的负载均衡器中剔除。
+
+如果一个 Pod 升级后不能就绪，就不应该允许流量进入该 Pod，否则升级完成后导致所有服务不可用。
+
+下面更新 app 代码为[main_readiness.go](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/main_readiness.go)，并且构建新的镜像以及推送到远程仓库：
+
+```
+docker build . -t xiaoxaio/hellok8s:readiness
+docker push xiaoxiao/hellok8s:readiness
+```
+
+
+
+然后修改配置文件为 [deployment_readiness.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/deployment_readiness.yaml)
+
+更新 deployment：
+
+```
+kk apply -f deployment.yaml
+kk set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:readiness
+```
+
+
+
+现在可以发现两个 pod 一直处于没有 Ready 的状态当中，通过 describe 命令可以看到是因为 `Readiness probe failed: HTTP probe failed with statuscode: 500`的原因。 又因为设置了最大不可用的服务数量为 maxUnavailable=1，这样能保证剩下两个 v2 版本的 hellok8s 能继续提供服务。
+
+```
+$ kk get pods                                                       
+NAME                                READY   STATUS    RESTARTS   AGE
+hellok8s-go-http-764849969-9rtdw    1/1     Running   0          10m
+hellok8s-go-http-764849969-qfqds    1/1     Running   0          10m
+hellok8s-go-http-7b778ccdcd-c9kv4   0/1     Running   0          5s
+hellok8s-go-http-7b778ccdcd-fn7p6   0/1     Running   0          5s
+
+$ kk describe pod hellok8s-go-http-7b778ccdcd-c9kv4
+...
+Events:
+  Type     Reason     Age                  From               Message
+  ----     ------     ----                 ----               -------
+  Normal   Scheduled  112s                 default-scheduler  Successfully assigned default/hellok8s-go-http-7b778ccdcd-c9kv4 to k8s-node1
+  Normal   Pulled     111s                 kubelet            Container image "leigg/hellok8s:readiness" already present on machine
+  Normal   Created    111s                 kubelet            Created container hellok8s
+  Normal   Started    111s                 kubelet            Started container hellok8s
+  Warning  Unhealthy  21s (x22 over 110s)  kubelet            Readiness probe failed: HTTP probe failed with statuscode: 500
+```
+
+
+
+### 4.9 更新的暂停与恢复
+
+
+
+在更新时，有时候我们希望先**更新** 1 个 Pod，通过监控各项指标日志来验证没问题后，再继续更新其他 Pod。这个需求可以通过**暂停和恢复** Deployment 来解决。
+
+这也叫做**金丝雀发布**。
+
+这里会用到的暂停和恢复命令如下：
+
+```
+kk rollout pause deploy {deploy-name}
+kk rollout resume deploy {deploy-name}
+```
+
+
+
+操作步骤如下：
+
+```
+# 一次性执行两条命令
+kk set image deployment/hellok8s-go-http hellok8s=xiaoxiao/hellok8s:v2
+kk rollout pause deploy hellok8s-go-http
+
+# 现在观察更新情况，会发现只有一个pod被更新
+kk get pods
+
+# 如果此刻想要回滚（N需要替换为具体版本号）
+kk rollout undo deployment hellok8s-go-http --to-revision=N
+
+# 若要继续更新
+kk rollout resume deploy hellok8s-go-http
+```
+
+
+
+另一种稍微麻烦但更稳妥的方式是部署一个使用新镜像的 Deployment， 它与旧 Deployment 有着相同标签组但不同名（比如`deployment-xxx-v2`）， 相同标签可以让新 Deployment 与旧 Deployment 同时接收外部流量，若新 Deployment 稳定运行一段时间后没有问题则停止旧 Deployment。
+
+
+
+### 4.10 底层控制器 ReplicaSet
+
+实际上，Pod 的**副本集功能**并不是由 Deployment 直接提供的，而是由 Deployment 管理的 **ReplicaSet** 控制器来提供的。
+
+ReplicaSet 是一个相比 Deployment 更低级的控制器，它负责维护一组在任何时候都处于运行状态且符合预期数量的 Pod 副本的稳定集合。 然而由于 ReplicaSet 不具备滚动更新和回滚等一些业务常用的流水线功能，所以通常情况下，我们更推荐使用 Deployment 或 DaemonSet 等其他控制器 而不是直接使用 ReplicaSet。你可以通过 [官方文档](https://kubernetes.io/zh-cn/docs/concepts/workloads/controllers/ReplicaSet) 了解更多 ReplicaSet 细节。
+
+[replicaset.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/replicaset.yaml) 是一个可参考的示例。
+
