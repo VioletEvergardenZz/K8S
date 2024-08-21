@@ -1,7 +1,5 @@
 # Kubernetes
 
-
-
 Kubernetes 已经成为云原生技术的核心引擎，为应用程序的构建、部署和扩展提供了无与伦比的灵活性和可靠性。对于想要掌握**现代容器编排技术**的开发者和运维人员来说，深入理解 Kubernetes 是一项必不可少的技能。
 
 **环境准备**：
@@ -33,11 +31,7 @@ Kubernetes 已经成为云原生技术的核心引擎，为应用程序的构建
 
 ### 2. 安装容器运行时
 
-
-
 #### 2.1 介绍
-
-
 
 **容器运行时**是指用于直接对**镜像和容器**执行基础操作（比如拉取/删除镜像和对容器的创建（使用镜像）/查询/修改/获取/删除等操作）的软件。
 
@@ -943,11 +937,11 @@ docker push leigg/hellok8s:v1
 
 Pod 术语的起源：在英语中，会将 a group of whales（一群鲸鱼） 称作*a Pod of whales* ，Pod 就是来源于此。因为 Docker 的 Logo 是鲸鱼拖着一堆集装箱（表示 Docker 托管一个个容器）， 所以在 K8s 中，Pod 就是一组容器的集合。———参考自 Kubernetes 修炼手册
 
-K8s 当然支持容器化应用，但是，用户无法直接在集群中运行一个容器，而是需要将容器定义在 Pod 中来运行。 Pod 是 Kubernetes 中最小的可部署和调度单元，通常包含一个或多个容器。这些紧密耦合容器共享名字空间和文件系统卷，类似运行在同一主机上的应用程序和其辅助进程。
+K8s 支持容器化应用，但是，用户无法直接在集群中运行一个容器，而是需要将容器定义在 Pod 中来运行。 Pod 是 Kubernetes 中最小的可部署和调度单元，通常包含一个或多个容器。这些紧密耦合容器共享名字空间和文件系统卷，类似运行在同一主机上的应用程序和其辅助进程。
 
 Pod 有两种运行方式。一种是单独运行（叫做单例），这种方式运行的 Pod 没有自愈能力，一旦因为各种原因被删除就不会再重新创建。 另一种则是常见的在控制器管理下运行，控制器会持续监控 Pod 副本数量是否符合预期，并在 Pod 异常时重新创建新的 Pod 进行替换。
 
-在阅读完本章节后，你可以在 [example_pod](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/example_pod) 目录下查看更多 Pod 模板示例。
+可以在 [example_pod](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/example_pod) 目录下查看更多 Pod 模板示例。
 
 
 
@@ -955,7 +949,7 @@ Pod 有两种运行方式。一种是单独运行（叫做单例），这种方�
 
 k8s 中的各种资源对象基本都是由 yaml 文件定义，Pod 也不例外。下面是使用 nginx 最新版本的单例 Pod 模板：
 
-```
+```yaml
 # nginx.yaml
 apiVersion: v1
 kind: Pod  # 资源类型=pod
@@ -968,45 +962,35 @@ spec:
       image: nginx  # 镜像默认来源 DockerHub
 ```
 
-
-
 运行第一条 k8s 命令创建 pod：
 
+```bash
+kubectl apply -f nginx.yaml
 ```
-kubelet apply -f nginx.yaml
-```
-
-
 
 查看 nginx-pod 状态：
 
+```bash
+kubectl get pod nginx-pod
 ```
-kubelet get pod nginx-pod
-```
-
-
 
 查看全部 pods：
 
+```bash
+kubectl get pods
 ```
-kubelet get pods
-```
-
-
 
 命令中的`pods`可以简写为`po`。
 
 如果要删除 Pod，可以执行：
 
 ```
-kubelet delete pod nginx-pod
+kubectl delete pod nginx-pod
 ```
 
 
 
 ### 3.2 修改 Pod
-
-
 
 在创建 Pod 后，我们可能会修改 Pod 的部分配置，比如修改镜像版本，修改容器启动参数等。修改方式有两种：
 
@@ -1015,30 +999,26 @@ kubelet delete pod nginx-pod
 
 第一种方式比较简单，就不再演示。这里演示第二种方式:
 
-```
-$ kubelet patch pod nginx-pod -p '{"spec":{"containers":[{"name":"nginx-container","image":"nginx:1.10.1"}]}}'
+```bash
+$ kubectl patch pod nginx-pod -p '{"spec":{"containers":[{"name":"nginx-container","image":"nginx:1.10.1"}]}}'
 pod/nginx-pod patched
-$ kubelet describe po nginx-pod |grep Image
+$ kubectl describe po nginx-pod |grep Image
     Image:          nginx:1.10.1
     Image ID:       docker.io/library/nginx@sha256:35779791c05d119df4fe476db8f47c0bee5943c83eba5656a15fc046db48178b
 ```
-
-
 
 注意：修改容器配置会触发 Pod 内的容器重启，Pod 本身不会完全重启。
 
 一般是使用第一种方式，第二种方式由于参数复杂仅用于某些时候的临时修改。此外，PodSpec 中的大部分参数是创建后不可修改的，例如在尝试修改 Pod 网络时会得到以下提示：
 
-```
-$ kubelet apply -f nginx.yaml                                                                                 
+```bash
+$ kubectl apply -f nginx.yaml                                                                                 
 The Pod "nginx-pod" is invalid: spec: Forbidden: pod updates may not change fields other than 
     `spec.containers[*].image`, `spec.initContainers[*].image`, `spec.activeDeadlineSeconds`, 
     `spec.tolerations` (only additions to existing tolerations) or 
     `spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)
 ...
 ```
-
-
 
 可见允许修改的有镜像相关、`activeDeadlineSeconds`、`tolerations`和`terminationGracePeriodSeconds`这几个字段。 如果想要修改其他字段，只能在删除 Pod 后重新创建。
 
@@ -1048,35 +1028,30 @@ The Pod "nginx-pod" is invalid: spec: Forbidden: pod updates may not change fiel
 
 添加端口转发，然后就可以在宿主机访问`nginx-pod`
 
-```
+```bash
 # 宿主机4000映射到pod的80端口
 # 这条命令是阻塞的，仅用来调试pod服务是否正常运行
-kubelet port-forward nginx-pod 4000:80
-
+kubectl port-forward nginx-pod 4000:80
 # 打开另一个控制台
 curl http://127.0.0.1:4000
 ```
 
-
-
 进入 Pod Shell：
 
-```
-kubelet exec -it nginx-pod -- /bin/bash
+```bash
+kubectl exec -it nginx-pod -- /bin/bash
 
 # 当Pod内存在多个容器时，通过-c指定进入哪个容器
-kubelet exec -it nginx-pod -c nginx-container -- /bin/bash
+kubectl exec -it nginx-pod -c nginx-container -- /bin/bash
 ```
-
-
 
 其他 Pod 常用命令：
 
-```
-kubelet delete pod nginx-pod # 删除pod
-kubelet delete -f nginx.yaml  # 删除配置文件内的全部资源
-kubelet logs -f nginx-pod  # 查看日志（stdout/stderr）,支持 --tail <lines>
-kubelet logs -f nginx-pod -c container-2 # 指定查看某个容器的日志
+```bash
+kubectl delete pod nginx-pod # 删除pod
+kubectl delete -f nginx.yaml  # 删除配置文件内的全部资源
+kubectl logs -f nginx-pod  # 查看日志（stdout/stderr）,支持 --tail <lines>
+kubectl logs -f nginx-pod -c container-2 # 指定查看某个容器的日志
 ```
 
 
@@ -1106,7 +1081,7 @@ Init 容器有一些特点如下：
 - Init 容器支持普通容器的全部字段和特性，除了`lifecycle、livenessProbe、readinessProbe 和 startupProbe`
 - Pod 重启会导致 Init 容器重新执行
 
-Init 容器具有与应用容器分离的单独镜像，我们可以使用它来完成一些常规的脚本任务，比如需要`sed、awk、python 或 dig` 这样的工具完成的任务，而没必要在应用容器中去安装这些命令。
+Init 容器具有与应用容器分离的单独镜像，我们可以使用它来**完成一些常规的脚本任务**，比如需要`sed、awk、python 或 dig` 这样的工具完成的任务，而没必要在应用容器中去安装这些命令。
 
 说明：包含常用工具的镜像有 busybox，appropriate/curl 等。
 
@@ -1120,30 +1095,25 @@ Init 容器具有与应用容器分离的单独镜像，我们可以使用它来
 
 创建 Pod：
 
-```
-$ kubelet apply -f pod.yaml
-# 几秒后
-$ kubelet get pods
+```bash
+$ kubectl apply -f pod.yaml
+$ kubectl get pods
 NAME      READY   STATUS    RESTARTS   AGE
 go-http   1/1     Running   0          17s
 ```
 
-
-
 临时开启端口转发（在 master 节点）：
 
-```
+```bash
 # 绑定pod端口3000到master节点的3000端口
-kubelet port-forward go-http 3000:3000
+kubectl port-forward go-http 3000:3000
 ```
-
-
 
 现在 pod 提供的 http 服务可以在 master 节点上可用。
 
 打开另一个会话测试：
 
-```
+```bash
 $ curl http://localhost:3000
 [v1] Hello, Kubernetes!#
 ```
@@ -1152,7 +1122,7 @@ $ curl http://localhost:3000
 
 ### 3.7 Pod 的生命周期
 
-通过`kubelet get po`看到的`STATUS`字段存在以下情况：
+通过`kubectl get po`看到的`STATUS`字段存在以下情况：
 
 - Pending（挂起）： Pod 正在调度中（主要是节点选择）。
 - ContainerCreating（容器创建中）： Pod 已经被调度，但其中的容器尚未完全创建和启动（包含镜像拉取）。
@@ -1199,13 +1169,11 @@ Pod 是临时性的一次性实体，Pod 的调度过程就是将 Pod 调度到�
 - DaemonSet
 - Job/CronJob
 
-下文将进一步介绍这些控制器。
-
 
 
 ### 3.9 Pod 联网
 
-每个 **Pod 能够获得一个独立的 IP 地址**，Pod 中的容器共享网络命名空间，包括 IP 地址和网络端口。Pod 内的容器可以使用 localhost 互相通信，它们也能通过如 SystemV 信号量或 POSIX 共享内存这类标准的进程间通信方式互相通信。Pod 间通信或 Pod 对外暴露服务需要使用 **Service** 资源，这将在后面的章节中提到。
+每个 **Pod 能够获得一个独立的 IP 地址**，Pod 中的容器共享网络命名空间，包括 IP 地址和网络端口。Pod 内的容器可以使用 localhost 互相通信，它们也能通过如 SystemV 信号量或 POSIX 共享内存这类标准的进程间通信方式互相通信。Pod 间通信或 Pod 对外暴露服务需要使用 **Service** 资源
 
 Pod 默认可以访问外部网络。
 
@@ -3082,7 +3050,7 @@ busybox-use-downwardapi
 
 ## 11. 存储与配置
 
-如果你的应用需要使用存储功能，那么你需要先了解存储卷（Volume）的概念。k8s 定义了下面几类存储卷（volume）抽象来实现相应功能：
+k8s 定义了下面几类存储卷（volume）抽象来实现相应功能：
 
 1. 本地存储卷：用于 Pod 内多个容器间的存储共享，或这 Pod 与节点之间的存储共享；
 2. 网络存储卷：用于多个 Pod 之间甚至是跨节点的存储共享；
