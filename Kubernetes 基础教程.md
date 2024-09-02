@@ -1201,30 +1201,26 @@ Pod 中的容器所看到的系统主机名与为 Pod 名称相同。
 
 下面使用 [deployment.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/deployment.yaml) 作为示例进行演示：
 
-```
-$ kubelet apply -f deployment.yaml
+```bash
+$ kubectl apply -f deployment.yaml
 deployment.apps/hellok8s-go-http created
 
 # 查看启动的pod
-$ kubelet get deployments                
+$ kubectl get deployments                
 NAME               READY   UP-TO-DATE   AVAILABLE   AGE
 hellok8s-go-http   2/2     2            2           3m
 ```
 
-
-
 还可以查看 pod 运行的 node：
 
-```
+```bash
 # 这里的IP是pod ip，属于部署k8s集群时规划的pod网段
 # NODE就是集群中的node名称
-$ kubelet get pod -o wide
+$ kubectl get pod -o wide
 NAME                                READY   STATUS    RESTARTS   AGE   IP           NODE        NOMINATED NODE   READINESS GATES
 hellok8s-go-http-55cfd74847-5jw7f   1/1     Running   0          68s   20.2.36.75   k8s-node1   <none>           <none>
 hellok8s-go-http-55cfd74847-zlf49   1/1     Running   0          68s   20.2.36.74   k8s-node1   <none>           <none>
 ```
-
-
 
 删除 pod 会自动重启一个新的 Pod，确保可用的 pod 数量与`deployment.yaml`中的`replicas`字段保持一致，不再演示。
 
@@ -1234,16 +1230,15 @@ hellok8s-go-http-55cfd74847-zlf49   1/1     Running   0          68s   20.2.36.7
 
 修改方式仍然支持修改模板文件和使用`patch`命令两种。 现在以修改模板中的`replicas=3`为例进行演示。为了能够观察 pod 数量变化过程，提前打开一个终端执行`kubelet get pods --watch`命令。 下面是演示情况：
 
-```
+```bash
 # --watch可简写为-w
-$ kubelet get pods --watch
+$ kubectl get pods --watch
 NAME                                READY   STATUS    RESTARTS   AGE
 hellok8s-go-http-58cb496c84-cft9j   1/1     Running   0          4m7s
 
 
 # 在另一个终端执行patch命令
-# kubelet patch deployment hellok8s-go-http -p '{"spec":{"replicas": 3}}'
-
+# kubectl patch deployment hellok8s-go-http -p '{"spec":{"replicas": 3}}'
 hellok8s-go-http-58cb496c84-sdrt2   0/1     Pending   0          0s
 hellok8s-go-http-58cb496c84-sdrt2   0/1     Pending   0          0s
 hellok8s-go-http-58cb496c84-pjkp9   0/1     Pending   0          0s
@@ -1253,8 +1248,6 @@ hellok8s-go-http-58cb496c84-pjkp9   0/1     ContainerCreating   0          0s
 hellok8s-go-http-58cb496c84-pjkp9   1/1     Running             0          1s
 hellok8s-go-http-58cb496c84-sdrt2   1/1     Running             0          1s
 ```
-
-
 
 最后，你可以通过`kubelet get pods`命令观察到 Deployment 管理下的 pod 副本数量为 3。
 
@@ -1268,22 +1261,20 @@ hellok8s-go-http-58cb496c84-sdrt2   1/1     Running             0          1s
 
 重新构建&推送镜像：
 
-```
+```bash
 docker build . -t leigg/hellok8s:v2
 docker push leigg/hellok8s:v2
 ```
 
-
-
 然后更新 deployment：
 
-```
+```bash
 # set image是一种命令式的更新操作，是一种临时性的操作方式，会导致当前状态与YAML清单定义不一致，生产环境中不推荐
 # 生产环境推荐通过修改YAML清单再apply的方式进行更新
-$ kubelet set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:v2
+$ kubectl set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:v2
 
 $ # 查看更新过程（如果镜像已经拉取，此过程会很快，你可能只会看到最后一条输出）
-$ kubelet rollout status deployment/hellok8s-go-http
+$ kubectl rollout status deployment/hellok8s-go-http
 Waiting for deployment "hellok8s-go-http" rollout to finish: 2 out of 3 new replicas have been updated...
 Waiting for deployment "hellok8s-go-http" rollout to finish: 2 out of 3 new replicas have been updated...
 Waiting for deployment "hellok8s-go-http" rollout to finish: 2 out of 3 new replicas have been updated...
@@ -1292,7 +1283,7 @@ Waiting for deployment "hellok8s-go-http" rollout to finish: 1 old replicas are 
 deployment "hellok8s-go-http" successfully rolled out
 
 # 也可以直接查看pod信息，会观察到pod正在更新（这是一个启动新pod，删除旧pod的过程，最终会维持到所配置的replicas数量）
-$ kubelet get po -w
+$ kubectl get po -w
 NAMESPACE     NAME                                       READY   STATUS              RESTARTS      AGE
 default       go-http                                    1/1     Running             0             14m
 default       hellok8s-go-http-55cfd74847-5jw7f          1/1     Terminating         0             3m
@@ -1302,63 +1293,53 @@ default       hellok8s-go-http-668c7f75bd-m56pm          0/1     ContainerCreati
 default       hellok8s-go-http-668c7f75bd-qlrk5          1/1     Running             0             14s
 
 # 绑定其中一个pod来测试（这是一个阻塞终端的操作）
-$ kubelet port-forward hellok8s-go-http-668c7f75bd-m56pm 3000:3000
+$ kubectl port-forward hellok8s-go-http-668c7f75bd-m56pm 3000:3000
 Forwarding from 127.0.0.1:3000 -> 3000
 Forwarding from [::1]:3000 -> 3000
 ```
 
-
-
 在另一个会话窗口执行
 
-```
+```bash
 $ curl http://localhost:3000
 [v2] Hello, Kubernetes!
 ```
 
-
-
 这里演示的更新是容器更新，修改其他属性也属于更新。
 
-通过`kubelet get deploy -o wide`或`kubelet describe deploy ...`命令可以查看 Pod 内每个容器使用的镜像名称（含版本）。
+通过`kubectl get deploy -o wide`或`kubectl describe deploy ...`命令可以查看 Pod 内每个容器使用的镜像名称（含版本）。
 
-Deployment 的镜像**更新或回滚**都是通过 **创建新的 ReplicaSet 和终止旧的 ReplicaSet** 来完成的，你可以通过`kubelet get rs -w` 来观察这一过程。 在更新完成后，应当看到新旧 ReplicaSet 是同时存在的：
+Deployment 的镜像**更新或回滚**都是通过 **创建新的 ReplicaSet 和终止旧的 ReplicaSet** 来完成的，你可以通过`kubectl get rs -w` 来观察这一过程。 在更新完成后，应当看到新旧 ReplicaSet 是同时存在的：
 
-```
-$ kubelet get rs -o wide
+```bash
+$ kubectl get rs -o wide
 NAME                          DESIRED   CURRENT   READY   AGE     CONTAINERS   IMAGES              SELECTOR
 hellok8s-go-http-55cfd74847   0         0         0       7m50s   hellok8s     leigg/hellok8s:v1   app=hellok8s,pod-template-hash=55cfd74847
 hellok8s-go-http-668c7f75bd   3         3         3       6m23s   hellok8s     leigg/hellok8s:v2   app=hellok8s,pod-template-hash=668c7f75bd
 ```
 
-
-
 **注意** ：k8s 使用旧的 ReplicaSet 作为 Deployment 的更新历史，回滚时会用到，所以请不要手动删除旧的 ReplicaSet。通过`kubectl rollout history deployment/hellok8s-go-http` 可以查看上线历史：
 
-```
-$ kubelet rollout history deployment/hellok8s-go-http                              
+```bash
+$ kubectl rollout history deployment/hellok8s-go-http                              
 deployment.apps/hellok8s-go-http 
 REVISION  CHANGE-CAUSE
 1         <none>
 2         <none>
 ```
 
-
-
 其中`CHANGE-CAUSE`列是更新原因，可以通过以下命令设置当前运行版本（REVISION）的备注：
 
-```plain
+```bash
 $ kubectl annotate deployment/hellok8s-go-http kubernetes.io/change-cause="image updated to v2"    
 deployment.apps/hellok8s-go-http annotated
 
-$ kubelet rollout history deployment/hellok8s-go-http                                               
+$ kubectl rollout history deployment/hellok8s-go-http                                               
 deployment.apps/hellok8s-go-http 
 REVISION  CHANGE-CAUSE
 1         <none>
 2         image updated to v2
 ```
-
-
 
 只有当 Deployment 的`.spec.template`部分发生变更时才会创建新的 REVISION，如果只是 Pod 数量变化或 Deployment 标签修改，则不会创建新的 REVISION。
 
@@ -1373,12 +1354,12 @@ REVISION  CHANGE-CAUSE
 1. 修改 main.go 为 [main_panic.go](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/main_panic.go) ；
 2. 构建镜像: `docker build . -t leigg/hellok8s:v2_problem`
 3. push 镜像：`docker push leigg/hellok8s:v2_problem`
-4. 更新 deployment 使用的镜像：`kubelet set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:v2_problem`
-5. 观察：`kubelet rollout status deployment/hellok8s-go-http` （会停滞，按 Ctrl-C 停止观察）
-6. 观察 pod：`kubelet get pods`
+4. 更新 deployment 使用的镜像：`kubectl set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:v2_problem`
+5. 观察：`kubectl rollout status deployment/hellok8s-go-http` （会停滞，按 Ctrl-C 停止观察）
+6. 观察 pod：`kubectl get pods`
 
-```
-$ kubelet get pods
+```bash
+$ kubectl get pods
 NAME                                READY   STATUS             RESTARTS     AGE
 go-http                             1/1     Running            0            36m
 hellok8s-go-http-55cfd74847-fv2kp   1/1     Running            0            17m
@@ -1391,20 +1372,18 @@ hellok8s-go-http-7c9d684dd-msj2c    0/1     CrashLoopBackOff   1 (4s ago)   6s
 # 查看每个副本集每次更新的pod情况（包含副本数量、上线时间、使用的镜像tag）
 # DESIRED-预期数量，CURRENT-当前数量，READY-可用数量
 # -l 进行标签筛选
-$ kubelet get rs -l app=hellok8s -o wide
+$ kubectl get rs -l app=hellok8s -o wide
 NAME                          DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES                      SELECTOR
 hellok8s-go-http-55cfd74847   0         0         0       76s   hellok8s     leigg/hellok8s:v1           app=hellok8s,pod-template-hash=55cfd74847
 hellok8s-go-http-668c7f75bd   3         3         3       55s   hellok8s     leigg/hellok8s:v2           app=hellok8s,pod-template-hash=668c7f75bd
 hellok8s-go-http-7c9d684dd    1         1         0       11s   hellok8s     leigg/hellok8s:v2_problem   app=hellok8s,pod-template-hash=7c9d684dd
 ```
 
-
-
 现在进行回滚：
 
-```
+```bash
 # 先查看deployment更新记录
-$ kubelet rollout history deployment/hellok8s-go-http               
+$ kubectl rollout history deployment/hellok8s-go-http               
 deployment.apps/hellok8s-go-http 
 REVISION  CHANGE-CAUSE
 1         <none>
@@ -1412,7 +1391,7 @@ REVISION  CHANGE-CAUSE
 3         <none>
 
 # 现在回到revision 2，可以先查看它具体信息（主要确认用的哪个镜像tag）
-$ kubelet rollout history deployment/hellok8s-go-http --revision=2
+$ kubectl rollout history deployment/hellok8s-go-http --revision=2
 deployment.apps/hellok8s-go-http with revision #2
 Pod Template:
   Labels:	app=hellok8s
@@ -1427,17 +1406,17 @@ Pod Template:
   Volumes:	<none>
 
 # 确认后再回滚（若不指定--to-revision=N，则是回到上个版本）
-$ kubelet rollout undo deployment/hellok8s-go-http        
+$ kubectl rollout undo deployment/hellok8s-go-http        
 deployment.apps/hellok8s-go-http rolled back
 
 # 检查副本集状态（所处的版本）
-$ kubelet get rs -l app=hellok8s -o wide                                
+$ kubectl get rs -l app=hellok8s -o wide                                
 hellok8s-go-http-55cfd74847   0         0         0       9m31s   hellok8s     leigg/hellok8s:v1           app=hellok8s,pod-template-hash=55cfd74847
 hellok8s-go-http-668c7f75bd   3         3         3       9m10s   hellok8s     leigg/hellok8s:v2           app=hellok8s,pod-template-hash=668c7f75bd
 hellok8s-go-http-7c9d684dd    0         0         0       8m26s   hellok8s     leigg/hellok8s:v2_problem   app=hellok8s,pod-template-hash=7c9d684dd
 
 # 恢复正常
-$ kubelet get deployments hellok8s-go-http
+$ kubectl get deployments hellok8s-go-http
 NAME               READY   UP-TO-DATE   AVAILABLE   AGE
 hellok8s-go-http   3/3     3            3           7m42s
 ```
@@ -1460,8 +1439,8 @@ k8s 1.15 版本起支持滚动更新，即先创建新的 pod，创建成功后�
 
 如果不设置，deployment 会有默认的配置：
 
-```
-$ kubelet describe -f deployment.yaml
+```bash
+$ kubectl describe -f deployment.yaml
 Name:                   hellok8s-go-http
 Namespace:              default
 CreationTimestamp:      Sun, 13 Aug 2023 21:09:33 +0800
@@ -1471,15 +1450,13 @@ Selector:               app=aaa,app1=hellok8s
 Replicas:               3 desired | 3 updated | 3 total | 3 available | 0 unavailable
 StrategyType:           RollingUpdate
 MinReadySeconds:        0
-RollingUpdateStrategy:  25% max unavailable, 25% max surge # <------ 看这
+RollingUpdateStrategy:  25% max unavailable, 25% max surge   # <------ 看这
 省略。。。
 ```
 
-
-
 为了明确地指定 deployment 的更新方式，我们需要在 yaml 中配置：
 
-```
+```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -1493,25 +1470,23 @@ spec:
 省略其他熟悉的配置项。。。
 ```
 
-
-
-这样，我们通过`kubelet apply`命令时会以滚动更新方式进行。
+这样，我们通过`kubectl apply`命令时会以滚动更新方式进行。
 
 从`maxSurge: 1`可以看出更新时最多会出现 4 个 pod，从`maxUnavailable: 1`可以看出最少会有 2 个 pod 正常运行。
 
-注意：无论是通过`kubelet set image ...`还是`kubelet rollout restart deployment xxx`方式更新 deployment 都会遵循配置进行滚动更新。
+注意：无论是通过`kubectl set image ...`还是`kubectl rollout restart deployment xxx`方式更新 deployment 都会遵循配置进行滚动更新。
 
 
 
 ### 4.6 控制 Pod 水平伸缩
 
-```
+```bash
 # 指定副本数量
-$ kubelet scale deployment/hellok8s-go-http --replicas=10
+$ kubectl scale deployment/hellok8s-go-http --replicas=10
 deployment.apps/hellok8s-go-http scaled
 
 # 观察到副本集版本并没有变化，而是数量发生变化
-$ kubelet get rs -l app=hellok8s -o wide                 
+$ kubectl get rs -l app=hellok8s -o wide                 
 NAME                          DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES                      SELECTOR
 hellok8s-go-http-55cfd74847   0         0         0       33m   hellok8s     leigg/hellok8s:v1           app=hellok8s,pod-template-hash=55cfd74847
 hellok8s-go-http-668c7f75bd   10        10        10      33m   hellok8s     leigg/hellok8s:v2           app=hellok8s,pod-template-hash=668c7f75bd
@@ -1522,30 +1497,28 @@ hellok8s-go-http-7c9d684dd    0         0         0       32m   hellok8s     lei
 
 ### 4.7 存活探针 (livenessProb)
 
-存活探测器来确定**什么时候要重启容器**。 例如，存活探测器可以探测到应用死锁（应用程序在运行，但是无法继续执行后面的步骤）情况。 重启这种状态下的容器有助于提高应用的可用性，即使其中存在缺陷。
+存活探测器来**确定什么时候要重启容器**。 例如，存活探测器可以探测到应用死锁（应用程序在运行，但是无法继续执行后面的步骤）情况。 重启这种状态下的容器有助于提高应用的可用性，即使其中存在缺陷。
 
 下面更新 app 代码为[main_liveness.go](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/main_liveness.go)，并且构建新的镜像以及推送到远程仓库：
 
-```
+```bash
 docker build . -t leigg/hellok8s:liveness
 docker push leigg/hellok8s:liveness
 ```
 
-
-
 然后在 deployment.yaml 内添加存活探针配置：
 
-```
+```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  # deployment唯一名称
+  # deployment 唯一名称
   name: hellok8s-go-http
 spec:
   replicas: 2 # 副本数量
   selector:
     matchLabels:
-      app: hellok8s # 管理template下所有 app=hellok8s的pod，（要求和template.metadata.labels完全一致！！！否则无法部署deployment）
+      app: hellok8s # 管理 template下所有 app = hellok8s 的pod，（要求和template.metadata.labels完全一致！！！否则无法部署deployment）
   template: # template 定义一组pod
     metadata:
       labels:
@@ -1566,28 +1539,23 @@ spec:
             periodSeconds: 3
 ```
 
-
-
 更新 deployment：
 
+```bash
+kubectl apply -f deployment.yaml
+kubectl set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:liveness
 ```
-kubelet apply -f deployment.yaml
-kubelet set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:liveness
-```
-
-
 
 现在 pod 将在 15s 后一直重启：
 
-```
-$ kubelet get pods
+```bash
+$ kubectl get pods
 NAME                                READY   STATUS    RESTARTS      AGE
 hellok8s-go-http-7d948dfc79-jwjrm   1/1     Running   2 (10s ago)   58s
 hellok8s-go-http-7d948dfc79-wpk2d   1/1     Running   2 (11s ago)   59s
 
-
 #可以看到探针失败原因
-$ kubelet describe pod hellok8s-go-http-7d948dfc79-wpk2d
+$ kubectl describe pod hellok8s-go-http-7d948dfc79-wpk2d
 ...
 Events:
   Type     Reason     Age                 From               Message
@@ -1599,8 +1567,6 @@ Events:
   Normal   Killing    41s (x3 over 89s)   kubelet            Container hellok8s failed liveness probe, will be restarted
   Warning  Unhealthy  23s (x10 over 95s)  kubelet            Liveness probe failed: HTTP probe failed with statuscode: 500
 ```
-
-
 
 还有其他探测方式，比如 TCP、gRPC、Shell 命令。
 
@@ -1616,35 +1582,31 @@ Events:
 
 下面更新 app 代码为[main_readiness.go](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/main_readiness.go)，并且构建新的镜像以及推送到远程仓库：
 
-```
+```bash
 docker build . -t leigg/hellok8s:readiness
 docker push leigg/hellok8s:readiness
 ```
-
-
 
 然后修改配置文件为 [deployment_readiness.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/deployment_readiness.yaml)
 
 更新 deployment：
 
+```bash
+kubectl apply -f deployment.yaml
+kubectl set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:readiness
 ```
-kubelet apply -f deployment.yaml
-kubelet set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:readiness
-```
-
-
 
 现在可以发现两个 pod 一直处于没有 Ready 的状态当中，通过 describe 命令可以看到是因为 `Readiness probe failed: HTTP probe failed with statuscode: 500`的原因。 又因为设置了最大不可用的服务数量为 maxUnavailable=1，这样能保证剩下两个 v2 版本的 hellok8s 能继续提供服务。
 
-```
-$ kubelet get pods                                                       
+```bash
+$ kubectl get pods                                                       
 NAME                                READY   STATUS    RESTARTS   AGE
 hellok8s-go-http-764849969-9rtdw    1/1     Running   0          10m
 hellok8s-go-http-764849969-qfqds    1/1     Running   0          10m
 hellok8s-go-http-7b778ccdcd-c9kv4   0/1     Running   0          5s
 hellok8s-go-http-7b778ccdcd-fn7p6   0/1     Running   0          5s
 
-$ kubelet describe pod hellok8s-go-http-7b778ccdcd-c9kv4
+$ kubectl describe pod hellok8s-go-http-7b778ccdcd-c9kv4
 ...
 Events:
   Type     Reason     Age                  From               Message
@@ -1660,39 +1622,33 @@ Events:
 
 ### 4.9 更新的暂停与恢复
 
-
-
 在更新时，有时候我们希望先**更新** 1 个 Pod，通过监控各项指标日志来验证没问题后，再继续更新其他 Pod。这个需求可以通过**暂停和恢复** Deployment 来解决。
 
 这也叫做**金丝雀发布**。
 
 这里会用到的暂停和恢复命令如下：
 
+```bash
+kubectl rollout pause deploy {deploy-name}
+kubectl rollout resume deploy {deploy-name}
 ```
-kubelet rollout pause deploy {deploy-name}
-kubelet rollout resume deploy {deploy-name}
-```
-
-
 
 操作步骤如下：
 
-```
+```bash
 # 一次性执行两条命令
-kubelet set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:v2
-kubelet rollout pause deploy hellok8s-go-http
+kubectl set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:v2
+kubectl rollout pause deploy hellok8s-go-http
 
 # 现在观察更新情况，会发现只有一个pod被更新
-kubelet get pods
+kubectl get pods
 
 # 如果此刻想要回滚（N需要替换为具体版本号）
-kubelet rollout undo deployment hellok8s-go-http --to-revision=N
+kubectl rollout undo deployment hellok8s-go-http --to-revision=N
 
 # 若要继续更新
-kubelet rollout resume deploy hellok8s-go-http
+kubectl rollout resume deploy hellok8s-go-http
 ```
-
-
 
 另一种稍微麻烦但更稳妥的方式是部署一个使用新镜像的 Deployment， 它与旧 Deployment 有着相同标签组但不同名（比如`deployment-xxx-v2`）， 相同标签可以让新 Deployment 与旧 Deployment 同时接收外部流量，若新 Deployment 稳定运行一段时间后没有问题则停止旧 Deployment。
 
@@ -1700,7 +1656,7 @@ kubelet rollout resume deploy hellok8s-go-http
 
 ### 4.10 底层控制器 ReplicaSet
 
-实际上，Pod 的**副本集功能**并不是由 Deployment 直接提供的，而是由 Deployment 管理的 **ReplicaSet** 控制器来提供的。
+Pod 的**副本集功能**并不是由 Deployment 直接提供的，而是由 Deployment 管理的 **ReplicaSet** 控制器来提供的。
 
 ReplicaSet 是一个相比 Deployment 更低级的控制器，它负责维护一组在任何时候都处于运行状态且符合预期数量的 Pod 副本的稳定集合。 然而由于 ReplicaSet 不具备滚动更新和回滚等一些业务常用的流水线功能，所以通常情况下，我们更推荐使用 Deployment 或 DaemonSet 等其他控制器 而不是直接使用 ReplicaSet。你可以通过 [官方文档](https://kubernetes.io/zh-cn/docs/concepts/workloads/controllers/ReplicaSet) 了解更多 ReplicaSet 细节。
 
@@ -1708,13 +1664,9 @@ ReplicaSet 是一个相比 Deployment 更低级的控制器，它负责维护一
 
 
 
-
-
 ## 5. 使用 DaemonSet
 
-
-
-DaemonSet 是一种特殊的控制器，它确保会在集群的**每个节点**（或大部分）上都运行 **一个** Pod 副本。在节点加入或退出集群时，DaemonSet 也会在相应节点增加或删除 Pod。 因此常用来**部署那些为节点本身提供服务或维护的 Pod**（如日志收集和转发、监控等）。
+DaemonSet 是一种特殊的控制器，它确保会在集群的**每个节点**（或大部分）上都运行 一个 Pod 副本。在节点加入或退出集群时，DaemonSet 也会在相应节点增加或删除 Pod。 因此常用来**部署那些为节点本身提供服务或维护的 Pod**（如日志收集和转发、监控等）。
 
 因为这一特性，DaemonSet 应用通常会在模板中直接指定映射容器端口到节点端口，不用担心同一个节点会运行多个 Pod 副本而导致端口冲突。
 
@@ -1722,24 +1674,25 @@ DaemonSet 通常会运行在每个节点上，但不包括 master 节点。因�
 
 [daemonset.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/daemonset.yaml) 是一个 DaemonSet 的模板示例。它的管理命令与 Deployment 没有较大差别，只是 DaemonSet 不基于 ReplicaSet。 具体演示如下：
 
-```
-$ kubelet apply -f daemonset.yaml 
+```bash
+$ kubectl apply -f daemonset.yaml 
 daemonset.apps/daemonset-hellok8s-go-http created
-$ kubelet get daemonset          
+
+$ kubectl get daemonset          
 NAME                         DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
 daemonset-hellok8s-go-http   2         2         2       2            2           <none>          8s
 
-$ kubelet get po -o wide|grep daemonset 
+$ kubectl get po -o wide|grep daemonset 
 daemonset-hellok8s-go-http-gwbsh    1/1     Running   0                    51s     20.2.36.75   k8s-node1    <none>           <none>
 daemonset-hellok8s-go-http-v44jm    1/1     Running   0                    51s     20.2.36.74   k8s-master   <none>           <none>
 
-$ kubelet set image daemonset/daemonset-hellok8s-go-http hellok8s=leigg/hellok8s:v2 
+$ kubectl set image daemonset/daemonset-hellok8s-go-http hellok8s=leigg/hellok8s:v2 
 daemonset.apps/daemonset-hellok8s-go-http image updated
 
-$ kubelet rollout status daemonset/daemonset-hellok8s-go-http                             
+$ kubectl rollout status daemonset/daemonset-hellok8s-go-http                             
 daemon set "daemonset-hellok8s-go-http" successfully rolled out
 
-$ kubelet rollout history daemonset/daemonset-hellok8s-go-http
+$ kubectl rollout history daemonset/daemonset-hellok8s-go-http
 daemonset.apps/daemonset-hellok8s-go-http 
 REVISION  CHANGE-CAUSE
 1         <none>
@@ -1753,8 +1706,6 @@ daemonset-hellok8s-go-http   2         2         2       2            2         
 
 
 ## 6. 使用 Job 和 CronJob
-
-
 
 Job 和 CronJob 控制器与 Deployment、Daemonset 都是同级的控制器。它俩都是用来执行一次性任务的，区别在于 Job 是一次性的，而 CronJob 是周期性的。
 
@@ -1772,35 +1723,33 @@ Job 和 CronJob 控制器与 Deployment、Daemonset 都是同级的控制器。�
 
 使用 [job.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/example_job/job.yaml) 测试**一次性任务**：
 
-```
-[node1 ~]$ kubelet apply -f job.yaml 
+```bash
+[node1 ~]$ kubectl apply -f job.yaml 
 job.batch/pods-job created
 
-[node1 ~]$ kubelet get job
+[node1 ~]$ kubectl get job
 NAME     COMPLETIONS  DURATION   AGE
 pods-job   0/1           19s     19s
 
 # DURATION 表示job启动到结束耗时
-[node1 ~]$ kubelet get job
+[node1 ~]$ kubectl get job
 NAME     COMPLETIONS   DURATION   AGE
 pods-job   1/1           36s     60s
 
 # Completed 表示pod正常终止
-[node1 ~]$ kubelet get pods
+[node1 ~]$ kubectl get pods
 NAME                    READY   STATUS      RESTARTS   AGE
 pods-simple-pod-kdjr6   0/1     Completed   0          4m41s
 
 # 查看pod日志（标准输出和错误）
-[node1 ~]$ kubelet logs pods-simple-pod-kdjr6
+[node1 ~]$ kubectl logs pods-simple-pod-kdjr6
 Start Job!
 Job Done!
 
 # 执行结束后，手动删除job，也可在yaml中配置自动删除
-[node1 ~]$ kubelet delete job pods-job
+[node1 ~]$ kubectl delete job pods-job
 job.batch "pods-job" deleted
 ```
-
-
 
 配置文件中启动`completions`字段来设置任务需要执行的总次数（串行式任务），启动`parallelism`字段来设置任务并发数量（并行式任务）。
 
@@ -1818,33 +1767,31 @@ job.batch "pods-job" deleted
 
 使用 [cronjob.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/example_job/cronjob.yaml) 测试：
 
-```
-[node1 ~]$ kubelet apply -f cronjob.yaml 
+```bash
+[node1 ~]$ kubectl apply -f cronjob.yaml 
 job.batch/pods-cronjob created
 
-[node1 ~]$ kubelet get cronjob
+[node1 ~]$ kubectl get cronjob
 NAME           SCHEDULE      SUSPEND   ACTIVE   LAST SCHEDULE   AGE
 pods-cronjob   */1 * * * *   False     1        28s             10s
 
 # cronjob内部还是调用的job
-[node1 ~]$ kubelet get job
+[node1 ~]$ kubectl get job
 NAME                    COMPLETIONS   DURATION   AGE
 pods-cronjob-28305226   1/1           34s        2m54s
 pods-cronjob-28305227   1/1           34s        114s
 pods-cronjob-28305228   1/1           34s        54s
 
 # 删除cronjob，会自动删除关联的job, pod
-[node1 ~]$ kubelet delete cronjob pods-cronjob
+[node1 ~]$ kubectl delete cronjob pods-cronjob
 cronjob.batch "pods-cronjob" deleted
-[node1 ~]$ kubelet get job
+[node1 ~]$ kubectl get job
 No resources found in default namespace.
 ```
 
 
 
 ### 6.3 其他控制器
-
-除了前面介绍的 Deployment、DaemonSet、Job 和 CronJob 控制器，其他还有：
 
 - ReplicationController 和 ReplicaSetController
 - StatefulController
@@ -1855,17 +1802,11 @@ No resources found in default namespace.
 在后来的版本中，一般都是创建 Deployment 控制器，由它自动托管 ReplicaSetController，用户无需操心后者（但可以命令查看）。 ReplicaSetController 也可通过模板创建，可自行查询。需要注意的是，手动创建的 ReplicaSetController 不能由 Deployment 控制器托管， 所以 ReplicaSetController 也不具有滚动更新、版本查看和回滚功能。
 
 **StatefulController**
-这是一种提供排序和唯一性保证的特殊 Pod 控制器，将在后面的章节中进行介绍。
-
-下一节，将介绍前面这些 Controller 控制的 Pod 集合如何有效且稳定的对外暴露服务。
-
-
+这是一种提供排序和唯一性保证的特殊 Pod 控制器
 
 
 
 ## 7. 使用 Service
-
-
 
 先提出几个问题：
 
@@ -1923,46 +1864,40 @@ ClusterIP 通过分配集群内部 IP 来在**集群内**（包含节点）暴�
 1. 修改 main.go 为 [main_hostname.go](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/main_hostname.go)
 2. 重新构建和推送镜像
 
-```
+```bash
 docker build . -t leigg/hellok8s:v3_hostname
 docker push leigg/hellok8s:v3_hostname
 ```
 
-
-
 1. 更新 deployment 使用的 image
 
-```
-kubelet set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:v3_hostname
+```bash
+kubectl set image deployment/hellok8s-go-http hellok8s=leigg/hellok8s:v3_hostname
 
 # 等待pod更新
 kubelet get pods --watch
 ```
 
-
-
 1. deployment 更新成功后，编写 Service 配置文件 [service-clusterip.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/service-clusterip.yaml)
 2. 应用 Service 配置文件，并观察 Endpoint 资源
 
-```
-kubelet apply -f service-clusterip.yaml
+```bash
+kubectl apply -f service-clusterip.yaml
 
-$ kubelet get svc
+$ kubectl get svc
 NAME                         TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)    AGE
 kubernetes                   ClusterIP   20.1.0.1      <none>        443/TCP    11h
 service-hellok8s-clusterip   ClusterIP   20.1.120.16   <none>        3000/TCP   20s
 
-$ kubelet get endpoints                  
+$ kubectl get endpoints                  
 NAME                         ENDPOINTS                         AGE
 kubernetes                   10.0.2.2:6443                     6h54m
 service-hellok8s-clusterip   20.2.36.72:3000,20.2.36.73:3000   6m38s
 ```
 
+这里通过`kubectl get svc`获取到的就是集群内`default`空间下的 service 列表，我们发布的自然是第二个，它的 ClusterIP 是`20.1.120.16`， 这个 IP 是可以在节点直接访问的：
 
-
-这里通过`kubelet get svc`获取到的就是集群内`default`空间下的 service 列表，我们发布的自然是第二个，它的 ClusterIP 是`20.1.120.16`， 这个 IP 是可以在节点直接访问的：
-
-```
+```bash
 $ curl 20.1.120.16:3000
 [v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-dstff
 # 多次访问，会观察到hostname变化，说明service进行了负载均衡
@@ -1970,28 +1905,26 @@ $ curl 20.1.120.16:3000
 [v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-wtdht
 ```
 
+然后我们通过`kubectl get endpoints`获取到的是 **Service 后端的逻辑 Pod 组的信息**，`ENDPOINTS` 列中包含的两个地址则是两个就绪的 pod 的访问地址（这个 IP 是 Pod 专属网段，节点无法直接访问）， 这些端点是和就绪的 pod 保持一致的（Service 会实时跟踪），下面通过控制 Pod 数量增减来观察。
 
-
-然后我们通过`kubelet get endpoints`获取到的是 **Service 后端的逻辑 Pod 组的信息**，`ENDPOINTS` 列中包含的两个地址则是两个就绪的 pod 的访问地址（这个 IP 是 Pod 专属网段，节点无法直接访问）， 这些端点是和就绪的 pod 保持一致的（Service 会实时跟踪），下面通过控制 Pod 数量增减来观察。
-
-在 Kubernetes 中，Endpoints 是一种资源对象，用于指定与一个 Service 关联的后端 Pod 的 IP 地址和端口信息。 Endpoints 对象充当服务发现机制的一部分，它告诉 Kubernetes 如何将流量路由到 Service 的后端 Pod。
+**在 Kubernetes 中，Endpoints 是一种资源对象，用于指定与一个 Service 关联的后端 Pod 的 IP 地址和端口信息。 Endpoints 对象充当服务发现机制的一部分，它告诉 Kubernetes 如何将流量路由到 Service 的后端 Pod。**
 
 Endpoints 一般都是通过 Service 自动生成的，Service 会自动跟踪关联的 Pod，当 Pod 状态发生变化时会自动更新 Endpoints。
 
-```
-$ kubelet scale deployment/hellok8s-go-http --replicas=3                      
+```bash
+$ kubectl scale deployment/hellok8s-go-http --replicas=3                      
 deployment.apps/hellok8s-go-http scaled
 
-$ kubelet get endpoints                                      
+$ kubectl get endpoints                                      
 NAME                         ENDPOINTS                                         AGE
 kubernetes                   10.0.2.2:6443                                     7h3m
 service-hellok8s-clusterip   20.2.36.72:3000,20.2.36.73:3000,20.2.36.74:3000   15m
 
-$ kubelet scale deployment/hellok8s-go-http --replicas=2
+$ kubectl scale deployment/hellok8s-go-http --replicas=2
 deployment.apps/hellok8s-go-http scaled
 
 # 注意pod ip可能发生变化
-$ kubelet get endpoints                                      
+$ kubectl get endpoints                                      
 NAME                         ENDPOINTS                         AGE
 kubernetes                   10.0.2.2:6443                     7h5m
 service-hellok8s-clusterip   20.2.36.72:3000,20.2.36.75:3000   17m
@@ -2001,18 +1934,18 @@ service-hellok8s-clusterip   20.2.36.72:3000,20.2.36.75:3000   17m
 
 `ClusterIP`除了在节点上可直接访问，在集群内也是可以访问的。下面启动一个 Nginx Pod 来访问这个虚拟的 ClusterIP （`20.1.120.16`）。
 
-1. 定义 [pod_nginx.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/pod_nginx.yaml)，并应用它，不再演示。( 可提前在 node 上拉取镜像：`ctr -n k8s.io images pull docker.io/library/nginx:latest`)
+1. 定义 [pod_nginx.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/pod_nginx.yaml)，并应用它，( 可提前在 node 上拉取镜像：`ctr -n k8s.io images pull docker.io/library/nginx:latest`)
 2. 进入 nginx pod shell，尝试访问 `service-hellok8s-clusterip`提供的 endpoint
 
-```
-$ kubelet get pods --watch
+```bash
+$ kubectl get pods --watch
 NAME                                READY   STATUS    RESTARTS   AGE
 hellok8s-go-http-6bb87f8cb5-dstff   1/1     Running   0          27m
 hellok8s-go-http-6bb87f8cb5-wtdht   1/1     Running   0          11m
 nginx                               1/1     Running   0          11s
 
 # 进入 nginx pod
-$ kubelet exec -it nginx -- bash 
+$ kubectl exec -it nginx -- bash 
 kubelet exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubelet exec [POD] -- [COMMAND] instead.
 
 # 访问 hellok8s 的 cluster ip
@@ -2025,13 +1958,13 @@ root@nginx:/# curl 20.1.120.16:3000
 
 
 **Service 访问及负载均衡原理**
-如果还记得文章开头的架构图，就会发现每个节点都运行着一个 kube-proxy 组件，这个组件会跟踪 Service 和 Pod 的动态变化，并且最新 的 Service 和 Pod 的映射关系会被记录到**每个节点**的 iptables 中，这样每个节点上的 iptables 规则都会随着 Service 和 Pod 资源自动更新。
+每个节点都运行着一个 kube-proxy 组件，这个组件会跟踪 Service 和 Pod 的动态变化，并且最新的 Service 和 Pod 的映射关系会被记录到每个节点的 iptables 中，这样每个节点上的 iptables 规则都会随着 Service 和 Pod 资源自动更新。
 
 iptables 使用 NAT 技术将虚拟 IP（也叫做 VIP）的流量转发到 Endpoint。
 
 通过在 master 节点（其他节点也可）`iptables -L -v -n -t nat`可以查看其配置，这个结果会很长。这里贴出关键的两条链：
 
-```
+```bash
 $ iptables -L -v -n -t nat
 ...
 Chain KUBE-SERVICES (2 references)
@@ -2051,28 +1984,24 @@ Chain KUBE-SVC-BRULDGNIV2IQDBPU (1 references)
 ...
 ```
 
-
-
 这里有 `KUBE-SERVICES`和 `KUBE-SVC-BRULDGNIV2IQDBPU`两条链，前者引用了后者。第一条链中，可以看到目标为`20.1.120.16` 的流量将被转发至`KUBE-SVC-BRULDGNIV2IQDBPU`链，即第二条链。在第二条链中又定义了 3 条转发规则：
 
 - 第一条规则会对源不是`20.2.0.0/16`地址范围内且目标端口是 3000 的所有 tcp 数据包执行 MASQ 动作，即 NAT 操作（转发时执行源 IP 替换）
 - 第二条规则将任意链内流量转发到目标`KUBE-SEP-JCBKJJ6OJ3DPB6OD`，尾部`probability`说明应用此规则的概率是 0.5
 - 第三条规则将任意链内流量转发到目标`KUBE-SEP-YHSEP23J6IVZKCOG`，概率也是 0.5（1-0.5） 而这 2 和 3 两条规则中的目标其实就是指向两个后端 Pod IP，可通过`iptables-save | grep KUBE-SEP-YHSEP23J6IVZKCOG` 查看其中一个目标明细：
 
-```
+```bash
 $ iptables-save | grep KUBE-SEP-YHSEP23J6IVZKCOG
 :KUBE-SEP-YHSEP23J6IVZKCOG - [0:0]
 -A KUBE-SEP-YHSEP23J6IVZKCOG -s 20.2.36.78/32 -m comment --comment "default/service-hellok8s-clusterip" -j KUBE-MARK-MASQ
 -A KUBE-SEP-YHSEP23J6IVZKCOG -p tcp -m comment --comment "default/service-hellok8s-clusterip" -m tcp -j DNAT --to-destination 20.2.36.78:3000
 -A KUBE-SVC-BRULDGNIV2IQDBPU -m comment --comment "default/service-hellok8s-clusterip -> 20.2.36.78:3000" -j KUBE-SEP-YHSEP23J6IVZKCOG
 
-$ kubelet get pods -o wide
+$ kubectl get pods -o wide
 NAME                                READY   STATUS    RESTARTS   AGE   IP           NODE        NOMINATED NODE   READINESS GATES
 hellok8s-go-http-6bb87f8cb5-dstff   1/1     Running   0          53m   20.2.36.77   k8s-node1   <none>           <none>
 hellok8s-go-http-6bb87f8cb5-wtdht   1/1     Running   0          52m   20.2.36.78   k8s-node1   <none>           <none>
 ```
-
-
 
 可以看到链`KUBE-SEP-YHSEP23J6IVZKCOG`的规则之一就是将转入的流量全部转发到目标`20.2.36.78:3000` ，这个 IP 也是名字为`hellok8s-go-http-6bb87f8cb5-wtdht`的 Pod 的内部 IP。
 
@@ -2091,9 +2020,9 @@ ClusterIP 只能在集群内访问 Pod 服务，而 NodePort 则进一步将服�
 
 具体指令如下：
 
-```
+```bash
 # 同样会分配一个 cluster-ip
-$ kubelet get svc service-hellok8s-nodeport                   
+$ kubectl get svc service-hellok8s-nodeport                   
 NAME                        TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
 service-hellok8s-nodeport   NodePort    20.1.252.217   <none>        3000:30000/TCP   79s
 
@@ -2133,8 +2062,6 @@ LoadBalancer 正是通过使用云厂商提供的负载均衡器（Service LoadB
 
 所以如果是使用公有云托管的 k8s 集群，那么通常也会使用它们提供的 SLB 服务。若是自己搭建的集群， 那么一般也不会使用`LoadBalancer`（私有集群一般也不支持`LoadBalancer`）。
 
-Note
-
 LoadBalancer 类型的 Service 本质上是由云厂商提供具体实现，大部分云厂商都支持四层和七层协议代理。
 
 - [阿里云使用私网 SLB 教程](https://help.aliyun.com/zh/ack/ack-managed-and-ack-dedicated/user-guide/configure-an-ingress-controller-to-use-an-internal-facing-slb-instance?spm=a2c4g.11186623.0.0.5d1736e0l59zqg)
@@ -2153,13 +2080,13 @@ LoadBalancer 类型的 Service 本质上是由云厂商提供具体实现，大�
 
 具体指令如下：
 
-```
-kubelet apply -f service-clusterip-headless.yaml
+```bash
+kubectl apply -f service-clusterip-headless.yaml
 
-kubelet apply -f pod_curl.yaml
+kubectl apply -f pod_curl.yaml
 
 # 进入curl容器
-kubelet exec -it curl -- /bin/sh
+kubectl exec -it curl -- /bin/sh
 # 访问测试
 / # curl service-hellok8s-clusterip-headless.default.svc.cluster.local:3000
 [v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-57r86
@@ -2174,8 +2101,6 @@ Name:      service-hellok8s-clusterip-headless.default.svc.cluster.local
 Address 1: 20.2.36.77 20-2-36-77.service-hellok8s-clusterip-headless.default.svc.cluster.local
 Address 2: 20.2.36.78 20-2-36-78.service-hellok8s-clusterip-headless.default.svc.cluster.local
 ```
-
-
 
 这里的`service-hellok8s-clusterip-headless.default.svc.cluster.local`就是 Service 提供给集群内部访问 Pod 组的域名， 组成方式为`{ServiceName}.{Namespace}.svc.{ClusterDomain}`，其中 ClusterDomain 表示集群域，默认为`cluster.local`， `Namespace`在 Service 的 yaml 文件中未指定那就是 default。
 
@@ -2200,11 +2125,11 @@ ExternalName 也是 k8s 中一个特殊的 Service 类型，它不需要设置 s
 
 具体指令如下：
 
-```
-$ kubelet apply -f service-externalname.yaml
+```bash
+$ kubectl apply -f service-externalname.yaml
 
 # 进入curl容器
-$ kubelet exec -it curl -- /bin/sh          
+$ kubectl exec -it curl -- /bin/sh          
 / # ping service-hellok8s-externalname.default.svc.cluster.local
 PING service-hellok8s-externalname.default.svc.cluster.local (14.119.104.254): 56 data bytes
 64 bytes from 14.119.104.254: seq=0 ttl=54 time=9.353 ms
@@ -2236,18 +2161,12 @@ curl -s -H 'Host:www.baidu.com' http://service-hellok8s-externalname.default.svc
 <title>百度一下，你就知道</title>
 ```
 
-
-
-Important
-
 这里需要加`-H 'Host:www.baidu.com'` 才能通过代理服务器的 Host 请求头验证，以正常访问 Web 页面，否则 403。
 
-**用途说明**：ExternalName 这类 Service 一般用在集群内部需要调用外部服务的时候，比如云服务商托管的 DB 等服务。
+**用途说明**：ExternalName 这类 Service 一般用在**集群内部需要调用外部服务**的时候，比如云服务商托管的 DB 等服务。
 
 **无头 Service + Endpoints**
-另外，很多时候，比如是自己部署的 DB 服务，只有 IP 而没有域名，ExternalName 无法实现这个需求，需要使用`无头Service`+`Endpoints`来实现， 这里提供一个测试通过的模板 [service-headless-endpoints.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/service-headless-endpoints.yaml) 供读者自行练习。
-
-Note
+另外，很多时候，比如是自己部署的 DB 服务，只有 IP 而没有域名，ExternalName 无法实现这个需求，需要使用`无头Service`+`Endpoints`来实现， 这里提供一个测试通过的模板 [service-headless-endpoints.yaml](https://github.com/chaseSpace/k8s-tutorial-cn/blob/main/service-headless-endpoints.yaml) 自行练习。
 
 Endpoints 对象一般不需要手动创建，Service controller 会在 service 创建时自动创建，只有在需要关联集群外的服务时可能用到。 这个时候就可定义 Endpoints 模板，其中填入外部服务的 IP 和端口，然后应用即可。如果集群外的服务提供的地址是域名而不是 IP，则使用 ExternalName。
 
@@ -2272,32 +2191,26 @@ k8s 支持下面两种服务发现方式：
 - kube-dns（推荐）
 - 环境变量
 
-
-
 #### 7.8.1 kube-dns
 
-如果你足够细心，你可能已经发现了`kube-system`空间下有个名为`kube-dns`的 service，这个 service 就是 k8s 内置的 DNS 组件， 它用来为集群中所有 Pod 提供**服务发现**功能。这个 service 通过 selector   **`k8s-app=kube-dns`**关联了名为`coredns`的 Pod 组。
+`kube-system`空间下有个名为`kube-dns`的 service，这个 service 就是 k8s 内置的 DNS 组件， 它用来为集群中所有 Pod 提供**服务发现**功能。这个 service 通过 selector   **`k8s-app=kube-dns`**关联了名为`coredns`的 Pod 组。
 
-```
-$ kubelet get pod,deployment,svc  -n kube-system |grep dns
+```bash
+$ kubectl get pod,deployment,svc  -n kube-system |grep dns
 pod/coredns-c676cc86f-4vzdl                    1/1     Running   1 (2d14h ago)       2d17h
 pod/coredns-c676cc86f-v8s8k                    1/1     Running   1 (2d14h ago)       2d17h
 deployment.apps/coredns                   2/2     2            2           2d18h
 service/kube-dns   ClusterIP   20.1.0.10    <none>        53/UDP,53/TCP,9153/TCP   2d18h
 ```
 
-
-
 k8s 通过每个节点部署的 kubelet 组件向每个新启动的 Pod 注入 DNS 配置（通过`/etc/resolv.conf`），从而实现服务发现。这里随意选择一个 Pod， 查看 DNS 配置。
 
-```
-$ kubelet exec -it hellok8s-go-http-6bb87f8cb5-c6bvs --  cat /etc/resolv.conf 
+```bash
+$ kubectl exec -it hellok8s-go-http-6bb87f8cb5-c6bvs --  cat /etc/resolv.conf 
 search default.svc.cluster.local svc.cluster.local cluster.local
 nameserver 20.1.0.10
 options ndots:5
 ```
-
-
 
 详细解释这个配置：
 
@@ -2310,8 +2223,8 @@ options ndots:5
 
 比如现在有如下部署：
 
-```
-$ kubelet get pod,svc                                                       
+```bash
+$ kubectl get pod,svc                                                       
 NAME                                    READY   STATUS    RESTARTS   AGE
 pod/hellok8s-go-http-6bb87f8cb5-c6bvs   1/1     Running   0          3h7m
 pod/hellok8s-go-http-6bb87f8cb5-g8fmd   1/1     Running   0          3h7m
@@ -2321,18 +2234,14 @@ service/kubernetes                   ClusterIP   20.1.0.1       <none>        44
 service/service-hellok8s-clusterip   ClusterIP   20.1.151.162   <none>        3000/TCP   3h33m
 ```
 
-
-
 那么`service-hellok8s-clusterip`就是一个集群内有效的虚拟主机名（指向两个`hellok8s-go-http`Pod），我们可以启动一个`curl` 容器来测试：
 
-```
-$ kubelet apply -f pod_curl.yaml                           
+```bash
+$ kubectl apply -f pod_curl.yaml                           
 pod/curl created
-$ kubelet exec -it curl --  curl service-hellok8s-clusterip:3000      
+$ kubectl exec -it curl --  curl service-hellok8s-clusterip:3000      
 [v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-g8fmd
 ```
-
-
 
 有了内置的服务发现功能，我们在部署微服务项目时就无需再单独部署如 consul 这样的服务发现组件了，节省了不少的开发及维护工作。
 
@@ -2342,8 +2251,8 @@ $ kubelet exec -it curl --  curl service-hellok8s-clusterip:3000
 
 在每个新启动的 Pod 中，kubelet 也会向其以环境变量形式注入**当前 Namespace**中已存在的 Service 连接信息，Pod 可以通过这些环境变量来发现其他 Service 的 IP 地址。 这里假设已经启动了`service/service-hellok8s-clusterip`，然后重新启动`pod/curl` ，然后在后者 shell 中查看`service/service-hellok8s-clusterip`的环境变量：
 
-```
-$ kubelet exec -it curl --  printenv |grep HELLOK8S
+```bash
+$ kubectl exec -it curl --  printenv |grep HELLOK8S
 SERVICE_HELLOK8S_CLUSTERIP_PORT_3000_TCP_PORT=3000
 SERVICE_HELLOK8S_CLUSTERIP_PORT_3000_TCP=tcp://20.1.151.162:3000
 SERVICE_HELLOK8S_CLUSTERIP_PORT_3000_TCP_ADDR=20.1.151.162
@@ -2353,17 +2262,13 @@ SERVICE_HELLOK8S_CLUSTERIP_SERVICE_PORT=3000
 SERVICE_HELLOK8S_CLUSTERIP_PORT_3000_TCP_PROTO=tcp
 ```
 
-
-
 所以此时我们也可以通过 env 的方式访问`service/service-hellok8s-clusterip`：
 
-```
-$ kubelet exec -it curl --  sh                                                                                    
+```bash
+$ kubectl exec -it curl --  sh                                                                                    
 / # curl $SERVICE_HELLOK8S_CLUSTERIP_SERVICE_HOST:$SERVICE_HELLOK8S_CLUSTERIP_SERVICE_PORT
 [v3] Hello, Kubernetes!, From host: hellok8s-go-http-6bb87f8cb5-g8fmd
 ```
-
-
 
 但是，环境变量方式对资源的创建顺序有要求。比如`pod/curl`先启动，某个 service 后创建，那么启动后的`pod/curl` 中就不会有这个 Service 相关的环境变量。 所以这里不推荐使用环境变量的方式访问 Service，而是推荐使用内置 DNS 的方式。
 
@@ -2383,13 +2288,13 @@ $ kubelet exec -it curl --  sh
 
 ## 8. 使用 Ingress
 
-上一章节中，我们知道有以下几种方式可以实现**对外**暴露服务：
+实现**对外**暴露服务：
 
 - NodePort（Pod 设置 HostNetWork 同理）
 - LoadBalancer
 - ExternalIP
 
-但在实际环境中，我们很少**直接使用**这些方式来对外暴露服务，因为它们都有一个比较严重的问题，那就是需要占用节点端口。也就是说， 占用节点端口的数量会随着服务数量的增加而增加，这就产生了很大的**端口管理成本**。 除此之外，这些方式也不支持域名以及 SSL 配置（LoadBalancer 的这些功能由云厂商提供支持），还需要额外配置其他具有丰富功能的反向代理组件，如 Nginx、Kong 等。
+但在实际环境中，我们很少直接使用这些方式来对外暴露服务，因为它们都有一个比较严重的问题，那就是需要占用节点端口。也就是说， 占用节点端口的数量会随着服务数量的增加而增加，这就产生了很大的**端口管理成本**。 除此之外，这些方式也不支持域名以及 SSL 配置（LoadBalancer 的这些功能由云厂商提供支持），还需要额外配置其他具有丰富功能的反向代理组件，如 Nginx、Kong 等。
 
 Ingress 就是为了解决这些问题而设计的，它允许你将 Service 映射到集群对外提供的某个端点上（由域名和端口组成的地址）， 这样我们就可以在 Ingress 中将多个 Service 配置到同一个域名的不同路径下对外提供服务， 避免了对节点端口的过多占用。Ingress 还支持路由规则和域名配置等高级功能，就像 Nginx 那样能够承担业务系统最边缘的反向代理+网关的角色。
 
@@ -2694,11 +2599,11 @@ $ kubectl apply -f deploy.yaml # 更新部署
 
 Namespace（命名空间）用来隔离集群内不同环境下的资源。仅同一 namespace 下的资源命名需要唯一，它的作用域仅针对带有名字空间的对象，例如 Deployment、Service 等。
 
-前面的教程中，默认使用的 namespace 是 `default`。
+默认使用的 namespace 是 `default`。
 
 创建多个 namespace：
 
-```
+```yaml
 # namespaces.yaml
 apiVersion: v1
 kind: Namespace
@@ -2713,15 +2618,12 @@ metadata:
   name: test
 ```
 
-
-
 使用：
 
-```
+```bash
 $ kubectl apply -f namespaces.yaml    
 # namespace/dev created
 # namespace/test created
-
 
 $ kubectl get namespaces          
 # NAME              STATUS   AGE
@@ -2737,17 +2639,13 @@ $ kubectl get namespaces
 $ kubectl get pods -n dev
 ```
 
-
-
-需要注意的是，**删除 namespace 时**，会默认删除该空间下的所有资源，需要谨慎操作。
+需要注意的是，删除 namespace 时，会默认删除该空间下的所有资源，需要谨慎操作。
 
 
 
 ## 10. 使用 ConfigMap 和 Secret
 
 ConfigMap 和 Secret 都是用来保存配置数据的，在模板定义和使用上没有大太差别。唯一的区别就是 Secret 是用来保存敏感型的配置数据，比如证书密钥、token 之类的。
-
-
 
 ### 10.1 ConfigMap
 
